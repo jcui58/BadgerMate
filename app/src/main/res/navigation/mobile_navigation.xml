@@ -10,16 +10,27 @@
         android:name="com.cs407.badgermate.ui.home.HomeFragment"
         android:label="@string/title_home"
         tools:layout="@layout/fragment_home" />
+    <fragment
+        android:id="@+id/navigation_dining"
+        android:name="com.cs407.badgermate.ui.dining.DiningFragment"
+        android:label="@string/title_dining"
+        tools:layout="@layout/fragment_dining" />
 
     <fragment
-        android:id="@+id/navigation_dashboard"
-        android:name="com.cs407.badgermate.ui.dashboard.DashboardFragment"
-        android:label="@string/title_dashboard"
-        tools:layout="@layout/fragment_dashboard" />
+        android:id="@+id/navigation_bus"
+        android:name="com.cs407.badgermate.ui.bus.BusFragment"
+        android:label="@string/title_bus"
+        tools:layout="@layout/fragment_bus" />
 
     <fragment
-        android:id="@+id/navigation_notifications"
-        android:name="com.cs407.badgermate.ui.notifications.NotificationsFragment"
-        android:label="@string/title_notifications"
-        tools:layout="@layout/fragment_notifications" />
+        android:id="@+id/navigation_event"
+        android:name="com.cs407.badgermate.ui.event.EventFragment"
+        android:label="@string/title_event"
+        tools:layout="@layout/fragment_bus" />
+
+    <fragment
+        android:id="@+id/navigation_profile"
+        android:name="com.cs407.badgermate.ui.profile.ProfileFragment"
+        android:label="@string/title_profile"
+        tools:layout="@layout/fragment_bus" />
 </navigation>

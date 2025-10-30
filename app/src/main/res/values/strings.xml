@@ -1,6 +1,8 @@
 <resources>
     <string name="app_name">BadgerMate</string>
     <string name="title_home">Home</string>
-    <string name="title_dashboard">Dashboard</string>
-    <string name="title_notifications">Notifications</string>
+    <string name="title_bus">Bus</string>
+    <string name="title_event">Event</string>
+    <string name="title_profile">Profile</string>
+    <string name="title_dining">Dining</string>>
 </resources>
