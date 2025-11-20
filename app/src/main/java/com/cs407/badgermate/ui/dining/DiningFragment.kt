@@ -7,7 +7,7 @@ import android.view.ViewGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModelProvider
 import com.cs407.badgermate.databinding.FragmentDiningBinding
 
 class DiningFragment : Fragment() {
@@ -15,13 +15,15 @@ class DiningFragment : Fragment() {
     private var _binding: FragmentDiningBinding? = null
     private val binding get() = _binding!!
 
-    private val diningViewModel: DiningViewModel by viewModels()
+    private lateinit var diningViewModel: DiningViewModel
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        diningViewModel = ViewModelProvider(this).get(DiningViewModel::class.java)
+        
         _binding = FragmentDiningBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
