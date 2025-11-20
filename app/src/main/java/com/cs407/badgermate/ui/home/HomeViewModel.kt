@@ -1,7 +1,5 @@
 package com.cs407.badgermate.ui.home
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import com.cs407.badgermate.data.User
 import com.cs407.badgermate.data.TodoItem
@@ -10,8 +8,11 @@ import java.util.Date
 
 class HomeViewModel : ViewModel() {
 
-    private val _text = MutableLiveData<String>().apply {
-        value = "This is home Fragment"
+    private val _uiState = MutableStateFlow(HomeUiState())
+    val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
+
+    fun updateSteps(newSteps: String) {
+        _uiState.value = _uiState.value.copy(steps = newSteps)
     }
     val text: LiveData<String> = _text
 
