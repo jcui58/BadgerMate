@@ -7,13 +7,19 @@ import android.view.ViewGroup
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModelProvider
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.cs407.badgermate.databinding.FragmentHomeBinding
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
+    
+    private lateinit var todoAdapter: TodoItemAdapter
+    private lateinit var eventAdapter: EventAdapter
+    private lateinit var homeViewModel: HomeViewModel
 
     private val homeViewModel: HomeViewModel by viewModels()
 
@@ -22,18 +28,65 @@ class HomeFragment : Fragment() {
         container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View {
+        homeViewModel = ViewModelProvider(this).get(HomeViewModel::class.java)
+
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
-        binding.homeCompose.apply {
-            setViewCompositionStrategy(
-                ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
-            )
-            setContent {
-                MaterialTheme {
-                    HomeScreen(viewModel = homeViewModel)
-                }
+        // Initialize adapters with callbacks
+        todoAdapter = TodoItemAdapter(
+            emptyList(),
+            onTodoToggle = { todoId ->
+                homeViewModel.toggleTodoCompletion(todoId)
+            },
+            onTodoDelete = { todoId ->
+                homeViewModel.deleteTodoItem(todoId)
+            },
+            onPriorityChange = { todoId, newPriority ->
+                homeViewModel.updateTodoPriority(todoId, newPriority)
             }
+        )
+        eventAdapter = EventAdapter(emptyList())
+
+        // Setup RecyclerViews
+        binding.todoRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
+            adapter = todoAdapter
+        }
+
+        binding.eventRecyclerView.apply {
+            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
+            adapter = eventAdapter
+        }
+
+        // Observe user info
+        homeViewModel.userInfo.observe(viewLifecycleOwner) { user ->
+            binding.userName.text = user.name
+            binding.userEmail.text = user.email
+        }
+
+        // Observe todo items
+        homeViewModel.todoItems.observe(viewLifecycleOwner) { todos ->
+            todoAdapter.updateTodos(todos)
+        }
+
+        // Observe events
+        homeViewModel.events.observe(viewLifecycleOwner) { events ->
+            eventAdapter.updateEvents(events)
+        }
+
+        // Setup FAB button for adding new todo
+        binding.fabAddTodo.setOnClickListener {
+            AddTodoDialog(requireContext()) { title, description, priority, dueDate ->
+                homeViewModel.addTodoItem(title, description, priority, dueDate)
+            }.show()
+        }
+
+        // Setup top button for adding new todo
+        binding.btnAddTodo.setOnClickListener {
+            AddTodoDialog(requireContext()) { title, description, priority, dueDate ->
+                homeViewModel.addTodoItem(title, description, priority, dueDate)
+            }.show()
         }
 
         return root
@@ -44,3 +97,4 @@ class HomeFragment : Fragment() {
         _binding = null
     }
 }
+
