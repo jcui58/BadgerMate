@@ -360,6 +360,7 @@ fun AddCourseDialog(
     var selectedDays by remember { mutableStateOf(setOf<Int>()) }
     var showStartTimePicker by remember { mutableStateOf(false) }
     var showEndTimePicker by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
 
     val dayNames = listOf("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -386,11 +387,15 @@ fun AddCourseDialog(
                 item {
                     OutlinedTextField(
                         value = courseName,
-                        onValueChange = { courseName = it },
+                        onValueChange = { 
+                            courseName = it
+                            errorMessage = ""
+                        },
                         label = { Text("Course Name") },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 12.dp)
+                            .padding(bottom = 12.dp),
+                        isError = errorMessage.contains("Course Name")
                     )
                 }
 
@@ -420,7 +425,8 @@ fun AddCourseDialog(
                     Text(
                         "Days of Week",
                         style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(bottom = 8.dp)
+                        modifier = Modifier.padding(bottom = 8.dp),
+                        color = if (errorMessage.contains("Days")) MaterialTheme.colorScheme.error else Color.Unspecified
                     )
                 }
 
@@ -439,9 +445,22 @@ fun AddCourseDialog(
                                 } else {
                                     selectedDays - index
                                 }
+                                errorMessage = ""
                             }
                         )
                         Text(dayNames[index], modifier = Modifier.padding(start = 8.dp))
+                    }
+                }
+
+                // Show error message if any
+                if (errorMessage.isNotEmpty()) {
+                    item {
+                        Text(
+                            errorMessage,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
                     }
                 }
 
@@ -465,16 +484,26 @@ fun AddCourseDialog(
                         }
                         Button(
                             onClick = {
-                                if (courseName.isNotEmpty() && selectedDays.isNotEmpty()) {
-                                    val newCourse = Course(
-                                        id = System.currentTimeMillis().toString(),
-                                        name = courseName,
-                                        daysOfWeek = selectedDays.toList(),
-                                        startTime = startTime,
-                                        endTime = endTime
-                                    )
-                                    onAddCourse(newCourse)
+                                errorMessage = ""
+                                
+                                if (courseName.isBlank()) {
+                                    errorMessage = "Please enter a course name"
+                                    return@Button
                                 }
+                                
+                                if (selectedDays.isEmpty()) {
+                                    errorMessage = "Please select at least one day"
+                                    return@Button
+                                }
+                                
+                                val newCourse = Course(
+                                    id = System.currentTimeMillis().toString(),
+                                    name = courseName,
+                                    daysOfWeek = selectedDays.toList(),
+                                    startTime = startTime,
+                                    endTime = endTime
+                                )
+                                onAddCourse(newCourse)
                             },
                             modifier = Modifier
                                 .weight(1f)
