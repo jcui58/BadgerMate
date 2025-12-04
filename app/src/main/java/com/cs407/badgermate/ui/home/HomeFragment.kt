@@ -4,18 +4,18 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
-import androidx.recyclerview.widget.LinearLayoutManager
 import com.cs407.badgermate.databinding.FragmentHomeBinding
+import com.cs407.badgermate.data.TodoItem as DataTodoItem
 
 class HomeFragment : Fragment() {
 
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
     
-    private lateinit var todoAdapter: TodoItemAdapter
-    private lateinit var eventAdapter: EventAdapter
     private lateinit var homeViewModel: HomeViewModel
 
     override fun onCreateView(
@@ -28,60 +28,70 @@ class HomeFragment : Fragment() {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
-        // Initialize adapters with callbacks
-        todoAdapter = TodoItemAdapter(
-            emptyList(),
-            onTodoToggle = { todoId ->
-                homeViewModel.toggleTodoCompletion(todoId)
-            },
-            onTodoDelete = { todoId ->
-                homeViewModel.deleteTodoItem(todoId)
-            },
-            onPriorityChange = { todoId, newPriority ->
-                homeViewModel.updateTodoPriority(todoId, newPriority)
+        // Setup Compose UI
+        binding.composeContainer?.apply {
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+            setContent {
+                // Use remember to hold mutable state that will trigger recompose
+                var userInfo by remember { mutableStateOf(homeViewModel.userInfo.value) }
+                var todoItems by remember { mutableStateOf(homeViewModel.todoItems.value) }
+                var courses by remember { mutableStateOf(homeViewModel.courses.value) }
+
+                // Observe LiveData changes
+                DisposableEffect(Unit) {
+                    val userObserver = androidx.lifecycle.Observer<com.cs407.badgermate.data.User> {
+                        userInfo = it
+                    }
+                    val todoObserver = androidx.lifecycle.Observer<List<DataTodoItem>> {
+                        todoItems = it
+                    }
+                    val courseObserver = androidx.lifecycle.Observer<List<Course>> {
+                        courses = it
+                    }
+
+                    homeViewModel.userInfo.observe(viewLifecycleOwner, userObserver)
+                    homeViewModel.todoItems.observe(viewLifecycleOwner, todoObserver)
+                    homeViewModel.courses.observe(viewLifecycleOwner, courseObserver)
+
+                    onDispose {
+                        homeViewModel.userInfo.removeObserver(userObserver)
+                        homeViewModel.todoItems.removeObserver(todoObserver)
+                        homeViewModel.courses.removeObserver(courseObserver)
+                    }
+                }
+
+                HomeScreenCompose(
+                    userName = userInfo?.name ?: "",
+                    userEmail = userInfo?.email ?: "",
+                    todoItems = todoItems?.map { todoItem ->
+                        TodoItem(
+                            id = todoItem.id,
+                            title = todoItem.title,
+                            description = todoItem.description ?: "",
+                            completed = todoItem.isCompleted,
+                            priority = todoItem.priority.name
+                        )
+                    } ?: emptyList(),
+                    courses = courses ?: emptyList(),
+                    onAddTodoClick = {
+                        AddTodoDialog(requireContext()) { title, description, priority, dueDate ->
+                            homeViewModel.addTodoItem(title, description, priority, dueDate)
+                        }.show()
+                    },
+                    onAddCourse = { course ->
+                        homeViewModel.addCourse(course)
+                    },
+                    onDeleteCourse = { courseId ->
+                        homeViewModel.deleteCourse(courseId)
+                    },
+                    onTodoToggle = { todoId ->
+                        homeViewModel.toggleTodoCompletion(todoId)
+                    },
+                    onTodoDelete = { todoId ->
+                        homeViewModel.deleteTodoItem(todoId)
+                    }
+                )
             }
-        )
-        eventAdapter = EventAdapter(emptyList())
-
-        // Setup RecyclerViews
-        binding.todoRecyclerView.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
-            adapter = todoAdapter
-        }
-
-        binding.eventRecyclerView.apply {
-            layoutManager = LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false)
-            adapter = eventAdapter
-        }
-
-        // Observe user info
-        homeViewModel.userInfo.observe(viewLifecycleOwner) { user ->
-            binding.userName.text = user.name
-            binding.userEmail.text = user.email
-        }
-
-        // Observe todo items
-        homeViewModel.todoItems.observe(viewLifecycleOwner) { todos ->
-            todoAdapter.updateTodos(todos)
-        }
-
-        // Observe events
-        homeViewModel.events.observe(viewLifecycleOwner) { events ->
-            eventAdapter.updateEvents(events)
-        }
-
-        // Setup FAB button for adding new todo
-        binding.fabAddTodo.setOnClickListener {
-            AddTodoDialog(requireContext()) { title, description, priority, dueDate ->
-                homeViewModel.addTodoItem(title, description, priority, dueDate)
-            }.show()
-        }
-
-        // Setup top button for adding new todo
-        binding.btnAddTodo.setOnClickListener {
-            AddTodoDialog(requireContext()) { title, description, priority, dueDate ->
-                homeViewModel.addTodoItem(title, description, priority, dueDate)
-            }.show()
         }
 
         return root

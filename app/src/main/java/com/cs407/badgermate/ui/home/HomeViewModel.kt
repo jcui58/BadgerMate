@@ -21,6 +21,12 @@ class HomeViewModel : ViewModel() {
     }
     val userInfo: LiveData<User> = _userInfo
 
+    // Courses
+    private val _courses = MutableLiveData<List<Course>>().apply {
+        value = emptyList()
+    }
+    val courses: LiveData<List<Course>> = _courses
+
     // Todo Items
     private val _todoItems = MutableLiveData<List<TodoItem>>().apply {
         value = listOf(
@@ -90,6 +96,18 @@ class HomeViewModel : ViewModel() {
         )
     }
     val events: LiveData<List<Event>> = _events
+
+    // Add new course
+    fun addCourse(course: Course) {
+        val currentList = _courses.value ?: emptyList()
+        _courses.value = currentList + course
+    }
+
+    // Delete course
+    fun deleteCourse(courseId: String) {
+        val currentList = _courses.value ?: return
+        _courses.value = currentList.filter { it.id != courseId }
+    }
 
     // Helper function to toggle todo completion
     fun toggleTodoCompletion(todoId: String) {
