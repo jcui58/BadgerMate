@@ -16,9 +16,9 @@ class BusFragment : Fragment() {
     companion object {
         private const val TAG = "BusFragment"
         // Fallback API key - will be used if manifest reading fails
-        private const val FALLBACK_API_KEY = "YOUR_WORKING_API_KEY_HERE"
+        private const val FALLBACK_API_KEY = "AIzaSyCfQmDUfAy6CiEJJ2M4do-xg90Gstu5Ym4"
     }
-
+    // ViewBinding reference for this fragment's layout
     private var _binding: FragmentBusBinding? = null
     private val binding get() = _binding!!
 

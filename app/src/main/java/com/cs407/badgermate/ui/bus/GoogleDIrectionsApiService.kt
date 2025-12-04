@@ -2,7 +2,9 @@ package com.cs407.badgermate.ui.bus
 
 import retrofit2.http.GET
 import retrofit2.http.Query
-
+/**
+ * Retrofit service definition for calling the Google Directions API.
+ */
 interface GoogleDirectionsApiService {
 
     @GET("directions/json")

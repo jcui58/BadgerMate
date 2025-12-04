@@ -11,7 +11,11 @@ class DirectionsRepository(private val api: GoogleDirectionsApiService) {
     companion object {
         private const val TAG = "DirectionsRepository"
     }
-
+    /**
+     * Fetch a route between the given origin and destination using the Directions API.
+     * Returns a list of LatLng points representing the decoded polyline on success,
+     * or an empty list if anything goes wrong.
+     */
     suspend fun fetchRoute(origin: String, destination: String, apiKey: String): List<LatLng> {
         return withContext(Dispatchers.IO) {
             try {

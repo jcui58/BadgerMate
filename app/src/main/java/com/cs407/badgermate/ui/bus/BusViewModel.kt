@@ -10,7 +10,10 @@ import com.google.android.gms.maps.model.LatLng
 import kotlinx.coroutines.launch
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-
+/**
+ * Holds UI state (origin/destination text and route path) and
+ * coordinates calls to the DirectionsRepository.
+ */
 class BusViewModel : ViewModel() {
 
     companion object {
@@ -23,7 +26,7 @@ class BusViewModel : ViewModel() {
     var pathPoints by mutableStateOf<List<LatLng>>(emptyList())
 
     private var apiKey: String = ""
-
+    // Retrofit service for Google Directions API
     private val api: GoogleDirectionsApiService by lazy {
         Retrofit.Builder()
             .baseUrl("https://maps.googleapis.com/maps/api/")
@@ -35,12 +38,16 @@ class BusViewModel : ViewModel() {
     private val repository by lazy {
         DirectionsRepository(api)
     }
+    /**
+     * Store the API key so it can be passed to network calls later.
+     */
 
     fun setApiKey(key: String) {
         apiKey = key
         Log.d(TAG, "API Key set: ${if (key.isNotEmpty()) "Key exists (${key.length} chars)" else "Key is EMPTY!"}")
     }
 
+// Some logcat infor for debug
     fun loadRoute() {
         if (origin.isBlank() || destination.isBlank()) {
             Log.d(TAG, "Origin or destination is blank - Origin: '$origin', Destination: '$destination'")

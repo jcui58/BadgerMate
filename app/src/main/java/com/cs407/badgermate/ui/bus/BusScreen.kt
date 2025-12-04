@@ -17,6 +17,13 @@ import com.google.android.gms.maps.model.LatLng
 import com.google.maps.android.compose.*
 import androidx.compose.ui.graphics.Color
 
+
+
+/**
+ *  - shows origin/destination text fields and a "Get Route" button
+ *  - displays a Google Map centered on Madison
+ *  - draws the transit route polyline and start/end markers when available
+ */
 @Composable
 fun BusScreen(
     origin: String,
@@ -41,7 +48,7 @@ fun BusScreen(
             cameraPositionState.position = CameraPosition.fromLatLngZoom(pathPoints.first(), 14f)
         }
     }
-
+// Check whether the app has location permission to enable "my location" features
     val hasLocationPermission = ContextCompat.checkSelfPermission(
         context, Manifest.permission.ACCESS_FINE_LOCATION
     ) == PackageManager.PERMISSION_GRANTED
@@ -101,7 +108,7 @@ fun BusScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // Google Map
+        // Display Google Map
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
