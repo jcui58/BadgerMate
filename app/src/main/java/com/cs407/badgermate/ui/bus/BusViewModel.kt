@@ -1,65 +1,83 @@
 package com.cs407.badgermate.ui.bus
 
+import android.util.Log
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-
-data class RouteEta(
-    val route: String,
-    val eta: String
-)
-
-data class Arrival(
-    val route: String,
-    val destination: String,
-    val eta: String,
-    val next: String,
-    val status: String
-)
-
-data class SavedRoute(
-    val title: String,
-    val subtitle: String,
-    val routeLabel: String,
-    val timeLabel: String
-)
-
-data class BusUiState(
-    val issuesNearby: Int = 3,
-    val liveRoutes: List<RouteEta> = listOf(
-        RouteEta("Route 80", "3 min"),
-        RouteEta("Route 81", "7 min"),
-        RouteEta("Route 82", "12 min")
-    ),
-    val nextClassName: String = "Data Structures & Algorithms",
-    val nextClassStartsIn: String = "starts in 15 minutes",
-    val departTime: String = "09:30",
-    val arrivals: List<Arrival> = listOf(
-        Arrival("Route 8C", "CS Building", "3 min", "Next: 15 min", "Arriving"),
-        Arrival("Route 81", "Library", "7 min", "Next: 22 min", "On Time"),
-        Arrival("Route 82", "Sports Center", "12 min", "Next: 27 min", "On Time")
-    ),
-    val savedRoutes: List<SavedRoute> = listOf(
-        SavedRoute(
-            title = "To Class",
-            subtitle = "Dorm Building A → CS Building",
-            routeLabel = "Route 80",
-            timeLabel = "8 min"
-        ),
-        SavedRoute(
-            title = "Back to Dorm",
-            subtitle = "Library → Dorm Building A",
-            routeLabel = "Route 81",
-            timeLabel = "12 min"
-        )
-    )
-)
+import androidx.lifecycle.viewModelScope
+import com.google.android.gms.maps.model.LatLng
+import kotlinx.coroutines.launch
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class BusViewModel : ViewModel() {
 
-    private val _uiState = MutableStateFlow(BusUiState())
-    val uiState: StateFlow<BusUiState> = _uiState.asStateFlow()
+    companion object {
+        private const val TAG = "BusViewModel"
+    }
 
-    // 后面如果要接后端，就在这里更新 _uiState
+    // Use mutableStateOf to manage state for Compose
+    var origin by mutableStateOf("")
+    var destination by mutableStateOf("")
+    var pathPoints by mutableStateOf<List<LatLng>>(emptyList())
+
+    private var apiKey: String = ""
+
+    private val api: GoogleDirectionsApiService by lazy {
+        Retrofit.Builder()
+            .baseUrl("https://maps.googleapis.com/maps/api/")
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(GoogleDirectionsApiService::class.java)
+    }
+
+    private val repository by lazy {
+        DirectionsRepository(api)
+    }
+
+    fun setApiKey(key: String) {
+        apiKey = key
+        Log.d(TAG, "API Key set: ${if (key.isNotEmpty()) "Key exists (${key.length} chars)" else "Key is EMPTY!"}")
+    }
+
+    fun loadRoute() {
+        if (origin.isBlank() || destination.isBlank()) {
+            Log.d(TAG, "Origin or destination is blank - Origin: '$origin', Destination: '$destination'")
+            return
+        }
+
+        Log.d(TAG, "========== LOADING ROUTE ==========")
+        Log.d(TAG, "Origin: $origin")
+        Log.d(TAG, "Destination: $destination")
+        Log.d(TAG, "API Key length: ${apiKey.length}")
+
+        viewModelScope.launch {
+            try {
+                Log.d(TAG, "Calling Directions API...")
+                val path = repository.fetchRoute(origin, destination, apiKey)
+                Log.d(TAG, "Route fetched successfully: ${path.size} points")
+
+                if (path.isEmpty()) {
+                    Log.w(TAG, "WARNING: Route is empty - no points returned!")
+                    Log.w(TAG, "This could mean:")
+                    Log.w(TAG, "  1. Directions API is not enabled")
+                    Log.w(TAG, "  2. Invalid origin/destination")
+                    Log.w(TAG, "  3. API returned error")
+                } else {
+                    Log.d(TAG, "First point: ${path.first()}")
+                    Log.d(TAG, "Last point: ${path.last()}")
+                }
+
+                pathPoints = path
+                Log.d(TAG, "pathPoints updated with ${pathPoints.size} points")
+
+            } catch (e: Exception) {
+                Log.e(TAG, "========== ERROR FETCHING ROUTE ==========")
+                Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
+                Log.e(TAG, "Error message: ${e.message}", e)
+                pathPoints = emptyList()
+            }
+        }
+    }
 }

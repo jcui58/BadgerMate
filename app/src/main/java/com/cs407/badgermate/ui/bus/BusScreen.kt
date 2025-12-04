@@ -1,179 +1,138 @@
 package com.cs407.badgermate.ui.bus
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import com.google.android.gms.maps.model.CameraPosition
+import com.google.android.gms.maps.model.LatLng
+import com.google.maps.android.compose.*
+import androidx.compose.ui.graphics.Color
 
 @Composable
-fun BusScreen(viewModel: BusViewModel) {
-    val uiState by viewModel.uiState.collectAsState()
+fun BusScreen(
+    origin: String,
+    destination: String,
+    pathPoints: List<LatLng>,
+    onOriginChange: (String) -> Unit,
+    onDestinationChange: (String) -> Unit,
+    onGetRoute: () -> Unit,
+) {
+    val context = LocalContext.current
+
+    // Default map location -> Madison, Wisconsin
+    val madison = LatLng(43.0731, -89.4012)
+
+    val cameraPositionState = rememberCameraPositionState {
+        position = CameraPosition.fromLatLngZoom(madison, 13f)
+    }
+
+    // Auto adjust camera when route is loaded
+    LaunchedEffect(pathPoints) {
+        if (pathPoints.isNotEmpty()) {
+            cameraPositionState.position = CameraPosition.fromLatLngZoom(pathPoints.first(), 14f)
+        }
+    }
+
+    val hasLocationPermission = ContextCompat.checkSelfPermission(
+        context, Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
             .padding(16.dp)
     ) {
-        // Header
-        Text(
-            text = "Bus Directions",
-            fontSize = 28.sp,
-            modifier = Modifier.padding(bottom = 16.dp),
-            color = MaterialTheme.colorScheme.primary
-        )
 
-        // Live Routes Section
-        Text(
-            text = "Live Routes",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        // Origin & Destination text fields
+        Row(Modifier.fillMaxWidth()) {
+            OutlinedTextField(
+                value = origin,
+                onValueChange = onOriginChange,
+                modifier = Modifier
+                    .weight(1f)
+                    .padding(end = 8.dp),
+                placeholder = { Text("e.g. Memorial Union") },
+                label = { Text("Origin") },
+                maxLines = 1,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Next
+                )
+            )
 
-        LazyColumn(
+            OutlinedTextField(
+                value = destination,
+                onValueChange = onDestinationChange,
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("e.g. State Street") },
+                label = { Text("Destination") },
+                maxLines = 1,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions.Default.copy(
+                    imeAction = ImeAction.Done
+                ),
+                keyboardActions = KeyboardActions(
+                    onDone = { onGetRoute() }
+                )
+            )
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        // Get Route Button
+        Button(
+            onClick = onGetRoute,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .height(48.dp),
+            enabled = origin.isNotBlank() && destination.isNotBlank()
         ) {
-            items(uiState.arrivals) { arrival ->
-                ArrivalCard(arrival)
-            }
+            Text("Get Route")
         }
 
-        // Saved Routes Section
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(
-            text = "Saved Routes",
-            fontSize = 18.sp,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
+        Spacer(Modifier.height(12.dp))
 
-        LazyColumn(
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(uiState.savedRoutes) { route ->
-                SavedRouteCard(route)
-            }
-        }
-    }
-}
-
-@Composable
-private fun ArrivalCard(arrival: Arrival) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = arrival.route,
-                        fontSize = 16.sp,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = arrival.destination,
-                        fontSize = 14.sp,
-                        color = Color.Gray
-                    )
-                }
-                Text(
-                    text = arrival.eta,
-                    fontSize = 14.sp,
-                    color = Color(0xFF4CAF50)
-                )
-            }
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = arrival.next,
-                    fontSize = 12.sp,
-                    color = Color.Gray
-                )
-                Text(
-                    text = arrival.status,
-                    fontSize = 12.sp,
-                    color = Color(0xFF4CAF50)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SavedRouteCard(route: SavedRoute) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = route.title,
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.primary
+        // Google Map
+        GoogleMap(
+            modifier = Modifier.fillMaxSize(),
+            cameraPositionState = cameraPositionState,
+            properties = MapProperties(
+                isMyLocationEnabled = hasLocationPermission
+            ),
+            uiSettings = MapUiSettings(
+                zoomControlsEnabled = true,
+                myLocationButtonEnabled = hasLocationPermission
             )
-            Text(
-                text = route.subtitle,
-                fontSize = 12.sp,
-                color = Color.Gray
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = route.routeLabel,
-                    fontSize = 12.sp,
-                    color = Color.DarkGray
+        ) {
+            // Draw route polyline
+            if (pathPoints.isNotEmpty()) {
+                Polyline(
+                    points = pathPoints,
+                    color = Color.Blue,
+                    width = 10f
                 )
-                Text(
-                    text = route.timeLabel,
-                    fontSize = 12.sp,
-                    color = Color.DarkGray
+            }
+
+            // Start and end markers
+            if (pathPoints.size >= 2) {
+                Marker(
+                    state = MarkerState(position = pathPoints.first()),
+                    title = "Start",
+                    snippet = origin
+                )
+                Marker(
+                    state = MarkerState(position = pathPoints.last()),
+                    title = "End",
+                    snippet = destination
                 )
             }
         }
