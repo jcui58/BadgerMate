@@ -14,4 +14,20 @@ interface GoogleDirectionsApiService {
         @Query("key") apiKey: String,
         @Query("mode") mode: String = "transit"
     ): DirectionsResponse
+
+    @GET("directions/json")
+    suspend fun getWalkingRoute(
+        @Query("origin") origin: String,
+        @Query("destination") destination: String,
+        @Query("key") apiKey: String,
+        @Query("mode") mode: String = "walking"
+    ): DirectionsResponse
+
+    @GET("directions/json")
+    suspend fun getBikingRoute(
+        @Query("origin") origin: String,
+        @Query("destination") destination: String,
+        @Query("key") apiKey: String,
+        @Query("mode") mode: String = "bicycling"
+    ): DirectionsResponse
 }

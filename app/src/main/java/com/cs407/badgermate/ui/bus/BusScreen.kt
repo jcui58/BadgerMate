@@ -3,6 +3,7 @@ package com.cs407.badgermate.ui.bus
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
@@ -32,6 +33,12 @@ fun BusScreen(
     onOriginChange: (String) -> Unit,
     onDestinationChange: (String) -> Unit,
     onGetRoute: () -> Unit,
+    routeDistance: String = "",
+    routeDuration: String = "",
+    walkingDistance: String = "",
+    walkingDuration: String = "",
+    bikingDistance: String = "",
+    bikingDuration: String = "",
 ) {
     val context = LocalContext.current
 
@@ -56,7 +63,7 @@ fun BusScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 24.dp, bottom = 16.dp)
     ) {
 
         // Origin & Destination text fields
@@ -108,9 +115,11 @@ fun BusScreen(
 
         Spacer(Modifier.height(12.dp))
 
-        // Display Google Map
+        // Display Google Map with smaller height and padding for info
         GoogleMap(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(300.dp),
             cameraPositionState = cameraPositionState,
             properties = MapProperties(
                 isMyLocationEnabled = hasLocationPermission
@@ -141,6 +150,104 @@ fun BusScreen(
                     title = "End",
                     snippet = destination
                 )
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Scrollable route information cards
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .padding(bottom = 80.dp)
+        ) {
+            if (pathPoints.isNotEmpty()) {
+                item {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Text(
+                                "Transit Route",
+                                style = MaterialTheme.typography.titleMedium,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                            if (routeDistance.isNotEmpty()) {
+                                Text("Distance: $routeDistance")
+                            }
+                            if (routeDuration.isNotEmpty()) {
+                                Text("Duration: $routeDuration")
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                // Walking estimate
+                if (walkingDistance.isNotEmpty() || walkingDuration.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "Walking",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                if (walkingDistance.isNotEmpty()) {
+                                    Text("Distance: $walkingDistance")
+                                }
+                                if (walkingDuration.isNotEmpty()) {
+                                    Text("Duration: $walkingDuration")
+                                }
+                            }
+                        }
+                    }
+
+                    item {
+                        Spacer(Modifier.height(12.dp))
+                    }
+                }
+
+                // Biking estimate
+                if (bikingDistance.isNotEmpty() || bikingDuration.isNotEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp)
+                            ) {
+                                Text(
+                                    "Biking",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(bottom = 8.dp)
+                                )
+                                if (bikingDistance.isNotEmpty()) {
+                                    Text("Distance: $bikingDistance")
+                                }
+                                if (bikingDuration.isNotEmpty()) {
+                                    Text("Duration: $bikingDuration")
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }

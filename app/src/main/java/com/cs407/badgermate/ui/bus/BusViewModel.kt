@@ -24,6 +24,12 @@ class BusViewModel : ViewModel() {
     var origin by mutableStateOf("")
     var destination by mutableStateOf("")
     var pathPoints by mutableStateOf<List<LatLng>>(emptyList())
+    var routeDistance by mutableStateOf("")
+    var routeDuration by mutableStateOf("")
+    var walkingDistance by mutableStateOf("")
+    var walkingDuration by mutableStateOf("")
+    var bikingDistance by mutableStateOf("")
+    var bikingDuration by mutableStateOf("")
 
     private var apiKey: String = ""
     // Retrofit service for Google Directions API
@@ -62,28 +68,52 @@ class BusViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 Log.d(TAG, "Calling Directions API...")
-                val path = repository.fetchRoute(origin, destination, apiKey)
-                Log.d(TAG, "Route fetched successfully: ${path.size} points")
-
-                if (path.isEmpty()) {
-                    Log.w(TAG, "WARNING: Route is empty - no points returned!")
-                    Log.w(TAG, "This could mean:")
-                    Log.w(TAG, "  1. Directions API is not enabled")
-                    Log.w(TAG, "  2. Invalid origin/destination")
-                    Log.w(TAG, "  3. API returned error")
+                val routeInfo = repository.fetchRoute(origin, destination, apiKey)
+                
+                if (routeInfo != null) {
+                    Log.d(TAG, "Route fetched successfully: ${routeInfo.pathPoints.size} points")
+                    pathPoints = routeInfo.pathPoints
+                    routeDistance = routeInfo.distance
+                    routeDuration = routeInfo.duration
+                    Log.d(TAG, "Distance: ${routeInfo.distance}, Duration: ${routeInfo.duration}")
+                    
+                    // Fetch walking route estimate
+                    val walkingInfo = repository.estimateWalkingRoute(origin, destination, apiKey)
+                    if (walkingInfo != null) {
+                        walkingDistance = walkingInfo.distance
+                        walkingDuration = walkingInfo.duration
+                        Log.d(TAG, "Walking Distance: ${walkingInfo.distance}, Duration: ${walkingInfo.duration}")
+                    }
+                    
+                    // Fetch biking route estimate
+                    val bikingInfo = repository.estimateBikingRoute(origin, destination, apiKey)
+                    if (bikingInfo != null) {
+                        bikingDistance = bikingInfo.distance
+                        bikingDuration = bikingInfo.duration
+                        Log.d(TAG, "Biking Distance: ${bikingInfo.distance}, Duration: ${bikingInfo.duration}")
+                    }
                 } else {
-                    Log.d(TAG, "First point: ${path.first()}")
-                    Log.d(TAG, "Last point: ${path.last()}")
+                    Log.w(TAG, "WARNING: Route is null - no route returned!")
+                    pathPoints = emptyList()
+                    routeDistance = ""
+                    routeDuration = ""
+                    walkingDistance = ""
+                    walkingDuration = ""
+                    bikingDistance = ""
+                    bikingDuration = ""
                 }
-
-                pathPoints = path
-                Log.d(TAG, "pathPoints updated with ${pathPoints.size} points")
 
             } catch (e: Exception) {
                 Log.e(TAG, "========== ERROR FETCHING ROUTE ==========")
                 Log.e(TAG, "Error type: ${e.javaClass.simpleName}")
                 Log.e(TAG, "Error message: ${e.message}", e)
                 pathPoints = emptyList()
+                routeDistance = ""
+                routeDuration = ""
+                walkingDistance = ""
+                walkingDuration = ""
+                bikingDistance = ""
+                bikingDuration = ""
             }
         }
     }

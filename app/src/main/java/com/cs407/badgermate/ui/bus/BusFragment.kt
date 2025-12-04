@@ -82,6 +82,12 @@ class BusFragment : Fragment() {
                     onOriginChange = { viewModel.origin = it },
                     onDestinationChange = { viewModel.destination = it },
                     onGetRoute = { viewModel.loadRoute() },
+                    routeDistance = viewModel.routeDistance,
+                    routeDuration = viewModel.routeDuration,
+                    walkingDistance = viewModel.walkingDistance,
+                    walkingDuration = viewModel.walkingDuration,
+                    bikingDistance = viewModel.bikingDistance,
+                    bikingDuration = viewModel.bikingDuration,
                 )
             }
         }

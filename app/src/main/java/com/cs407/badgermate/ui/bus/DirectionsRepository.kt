@@ -6,6 +6,12 @@ import com.google.maps.android.PolyUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+data class RouteInfo(
+    val pathPoints: List<LatLng>,
+    val distance: String,
+    val duration: String
+)
+
 class DirectionsRepository(private val api: GoogleDirectionsApiService) {
 
     companion object {
@@ -13,10 +19,10 @@ class DirectionsRepository(private val api: GoogleDirectionsApiService) {
     }
     /**
      * Fetch a route between the given origin and destination using the Directions API.
-     * Returns a list of LatLng points representing the decoded polyline on success,
-     * or an empty list if anything goes wrong.
+     * Returns RouteInfo containing path points, distance, and duration on success,
+     * or null if anything goes wrong.
      */
-    suspend fun fetchRoute(origin: String, destination: String, apiKey: String): List<LatLng> {
+    suspend fun fetchRoute(origin: String, destination: String, apiKey: String): RouteInfo? {
         return withContext(Dispatchers.IO) {
             try {
                 Log.d(TAG, "========== FETCHING ROUTE ==========")
@@ -31,7 +37,7 @@ class DirectionsRepository(private val api: GoogleDirectionsApiService) {
 
                 if (response.routes.isEmpty()) {
                     Log.w(TAG, "No routes found in response!")
-                    return@withContext emptyList()
+                    return@withContext null
                 }
 
                 val route = response.routes[0]
@@ -48,7 +54,19 @@ class DirectionsRepository(private val api: GoogleDirectionsApiService) {
                     Log.d(TAG, "Last point: ${decodedPoints.last()}")
                 }
 
-                decodedPoints
+                // Extract distance and duration from the first leg
+                val leg = route.legs.firstOrNull()
+                val distance = leg?.distance?.text ?: "Unknown"
+                val duration = leg?.duration?.text ?: "Unknown"
+
+                Log.d(TAG, "Distance: $distance")
+                Log.d(TAG, "Duration: $duration")
+
+                RouteInfo(
+                    pathPoints = decodedPoints,
+                    distance = distance,
+                    duration = duration
+                )
 
             } catch (e: Exception) {
                 Log.e(TAG, "========== ERROR IN REPOSITORY ==========")
@@ -58,7 +76,71 @@ class DirectionsRepository(private val api: GoogleDirectionsApiService) {
                 // Log the full stack trace
                 e.printStackTrace()
 
-                emptyList()
+                null
+            }
+        }
+    }
+
+    /**
+     * Estimate walking distance and duration based on the two points.
+     */
+    suspend fun estimateWalkingRoute(origin: String, destination: String, apiKey: String): RouteInfo? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching walking route...")
+                val response = api.getWalkingRoute(origin, destination, apiKey)
+
+                if (response.routes.isEmpty()) {
+                    return@withContext null
+                }
+
+                val route = response.routes[0]
+                val polyline = route.overview_polyline.points
+                val decodedPoints = PolyUtil.decode(polyline)
+                val leg = route.legs.firstOrNull()
+                val distance = leg?.distance?.text ?: "Unknown"
+                val duration = leg?.duration?.text ?: "Unknown"
+
+                RouteInfo(
+                    pathPoints = decodedPoints,
+                    distance = distance,
+                    duration = duration
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching walking route", e)
+                null
+            }
+        }
+    }
+
+    /**
+     * Fetch biking route with distance and duration.
+     */
+    suspend fun estimateBikingRoute(origin: String, destination: String, apiKey: String): RouteInfo? {
+        return withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching biking route...")
+                val response = api.getBikingRoute(origin, destination, apiKey)
+
+                if (response.routes.isEmpty()) {
+                    return@withContext null
+                }
+
+                val route = response.routes[0]
+                val polyline = route.overview_polyline.points
+                val decodedPoints = PolyUtil.decode(polyline)
+                val leg = route.legs.firstOrNull()
+                val distance = leg?.distance?.text ?: "Unknown"
+                val duration = leg?.duration?.text ?: "Unknown"
+
+                RouteInfo(
+                    pathPoints = decodedPoints,
+                    distance = distance,
+                    duration = duration
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching biking route", e)
+                null
             }
         }
     }
