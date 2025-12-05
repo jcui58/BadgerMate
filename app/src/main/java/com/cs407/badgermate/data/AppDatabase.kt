@@ -12,7 +12,7 @@ import com.cs407.badgermate.data.profile.ProfileEntity
 @Database(
     entities = [ProfileEntity::class, EventEntity::class],
     version = 3,
-    exportSchema = false//test
+    exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
 
