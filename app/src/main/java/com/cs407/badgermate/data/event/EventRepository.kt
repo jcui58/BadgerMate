@@ -9,7 +9,6 @@ import java.util.Locale
 class EventRepository(
     private val eventDao: EventDao
 ) {
-    // UW events 的 iCal 地址（你可以从浏览器复制实际链接替换下边这个）
     private val icsUrl = "https://today.wisc.edu/events.ics"
 
     fun getAllEvents(): List<EventEntity> = eventDao.getAllEvents()
@@ -21,7 +20,6 @@ class EventRepository(
 
     /**
      * 从官网的 .ics 拉取活动，并覆盖写入本地数据库
-     * 建议在 Dispatchers.IO 中调用
      */
     fun syncFromIcs() {
         val text = downloadIcs(icsUrl)
@@ -43,12 +41,13 @@ class EventRepository(
             EventEntity(
                 title = ev.summary,
                 organization = "UW–Madison",
-                category = "Academic", // 先统一写一个类别，后面再细分
+                category = "Academic",
                 startTime = ev.startMillis,
                 endTime = ev.endMillis,
                 displayTime = displayTime,
                 location = ev.location.ifBlank { "TBD" },
-                isMyEvent = false
+                isMyEvent = false,
+                url = ev.url
             )
         }
 

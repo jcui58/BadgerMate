@@ -2,9 +2,11 @@ package com.cs407.badgermate.ui.event
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.net.Uri
 import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
@@ -131,7 +133,7 @@ class EventFragment : Fragment() {
 
         addSpace(header, 12)
 
-        // 顶部统计：只剩 Upcoming & Interested 两个卡片
+        // 顶部统计：Upcoming & Interested
         fun statCard(label: String, assignRef: (TextView) -> Unit): View {
             val numTv = TextView(context).apply {
                 text = "0"
@@ -198,7 +200,7 @@ class EventFragment : Fragment() {
             interestedTv.text = interested.toString()
         }
 
-        // 构建卡片（不再显示 category tag）
+        // ========= 构建卡片 =========
         fun buildCard(e: EventEntity): View {
             val cardBg = GradientDrawable().apply {
                 cornerRadius = 20.dp().toFloat()
@@ -215,7 +217,7 @@ class EventFragment : Fragment() {
                 ).apply { setMargins(0, 12.dp(), 0, 0) }
             }
 
-            // 统一用一个渐变色 header
+            // 顶部渐变 header
             val top = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 intArrayOf(
@@ -248,10 +250,20 @@ class EventFragment : Fragment() {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }
 
-            headerPart.addView(titleView)
-            headerPart.addView(orgView)
+            val titleCol = LinearLayout(context).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                )
+                addView(titleView)
+                addView(orgView)
+            }
+
+            headerPart.addView(titleCol)
             card.addView(headerPart)
 
+            // ====== 下半部分：时间 / 地点 / 按钮行 ======
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(16.dp(), 12.dp(), 16.dp(), 12.dp())
@@ -279,24 +291,77 @@ class EventFragment : Fragment() {
             fun buttonText(isInterested: Boolean) =
                 if (isInterested) "Interested" else "Mark Interested"
 
-            val btnBg = GradientDrawable().apply {
+            val mainBtnBg = GradientDrawable().apply {
                 cornerRadius = 999f
                 setColor(Color.parseColor(buttonColor(e.isMyEvent)))
             }
 
-            val btn = TextView(context).apply {
+            val mainBtn = TextView(context).apply {
                 text = "❤  ${buttonText(e.isMyEvent)}"
-                background = btnBg
+                background = mainBtnBg
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 setPadding(16.dp(), 10.dp(), 16.dp(), 10.dp())
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
             }
 
-            btn.setOnClickListener {
+            mainBtn.setOnClickListener {
                 viewModel.toggleInterested(e)
             }
 
-            body.addView(btn)
+            val arrowBg = GradientDrawable().apply {
+                cornerRadius = 999f
+                setColor(Color.WHITE)
+                setStroke(1.dp(), Color.parseColor("#E5E5EA"))
+            }
+
+            val arrowBtn = TextView(context).apply {
+                text = "➔"
+                setTextColor(Color.parseColor("#4B5563"))
+                textSize = 16f
+                gravity = Gravity.CENTER
+                background = arrowBg
+                setPadding(0, 0, 0, 0)
+                layoutParams = LinearLayout.LayoutParams(40.dp(), 40.dp()).apply {
+                    setMargins(8.dp(), 0, 0, 0)
+                }
+
+                setOnClickListener {
+                    val url = e.url
+                    if (!url.isNullOrBlank()) {
+                        try {
+                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                            startActivity(intent)
+                        } catch (ex: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Cannot open event link",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    } else {
+                        Toast.makeText(
+                            context,
+                            "No link available for this event",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            }
+
+            // 按钮行：主按钮 + 右侧小箭头
+            val actionsRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            actionsRow.addView(mainBtn)
+            actionsRow.addView(arrowBtn)
+
+            body.addView(actionsRow)
             card.addView(body)
             return card
         }
@@ -330,8 +395,19 @@ class EventFragment : Fragment() {
                 refreshList?.invoke()
             }
 
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun beforeTextChanged(
+                s: CharSequence?,
+                start: Int,
+                count: Int,
+                after: Int
+            ) { }
+
+            override fun onTextChanged(
+                s: CharSequence?,
+                start: Int,
+                before: Int,
+                count: Int
+            ) { }
         })
 
         // 监听 ViewModel 列表变化
@@ -423,12 +499,13 @@ class EventFragment : Fragment() {
                     val newEvent = EventEntity(
                         title = title,
                         organization = org,
-                        category = "General",   // 固定一个占位分类，不再展示
+                        category = "General",
                         startTime = start,
                         endTime = end,
                         displayTime = display,
                         location = location,
-                        isMyEvent = false
+                        isMyEvent = false,
+                        url = null           // 手动添加的 event 默认没有链接
                     )
 
                     viewModel.addEvent(newEvent)

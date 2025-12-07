@@ -13,5 +13,6 @@ data class EventEntity(
     val endTime: Long,
     val displayTime: String,
     val location: String,
-    var isMyEvent: Boolean = false
+    var isMyEvent: Boolean = false,
+    val url: String? = null
 )
