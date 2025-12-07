@@ -10,10 +10,12 @@ import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import com.cs407.badgermate.data.AppDatabase
+import androidx.fragment.app.viewModels
 import com.cs407.badgermate.data.profile.ProfileEntity
 
 class ProfileFragment : Fragment() {
+
+    private val viewModel: ProfileViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -118,20 +120,6 @@ class ProfileFragment : Fragment() {
         }
         header.addView(major)
 
-        // ======= Profile 数据库：读取 / 初始化 =======
-        val db = AppDatabase.getInstance(requireContext())
-        val profileDao = db.profileDao()
-
-        var profile = profileDao.getProfile()
-        if (profile == null) {
-            profile = ProfileEntity(
-                name = "Alex Johnson",
-                grade = "Junior",
-                major = "Computer Science"
-            )
-            profileDao.saveProfile(profile)
-        }
-
         fun updateHeaderFromProfile(p: ProfileEntity) {
             name.text = p.name
             major.text = "${p.major} • ${p.grade}"
@@ -145,11 +133,12 @@ class ProfileFragment : Fragment() {
             avatar.text = if (initials.isNotEmpty()) initials else "🙂"
         }
 
-        updateHeaderFromProfile(profile)
+        // 观察 ViewModel 中的 profile，自动刷新 UI
+        viewModel.profile.observe(viewLifecycleOwner) { p ->
+            updateHeaderFromProfile(p)
+        }
 
         addSpace(header, 16)
-
-        // 去掉 Attendance / Steps / Events 统计区域后，直接把 header 放到 root
         root.addView(header)
 
         // =============== Edit Profile 按钮 ===============
@@ -177,7 +166,7 @@ class ProfileFragment : Fragment() {
         root.addView(editBtn)
 
         // === Edit Profile 对话框 ===
-        fun showEditDialog(current: ProfileEntity) {
+        fun showEditDialog(current: ProfileEntity?) {
             val dialogContext = requireContext()
 
             val container = LinearLayout(dialogContext).apply {
@@ -204,37 +193,35 @@ class ProfileFragment : Fragment() {
                 return edit
             }
 
-            val nameInput = labeledEdit("Name", current.name)
-            val gradeInput = labeledEdit("Grade", current.grade)
-            val majorInput = labeledEdit("Major", current.major)
+            val safe = current ?: ProfileEntity(
+                name = "Alex Johnson",
+                grade = "Junior",
+                major = "Computer Science"
+            )
+
+            val nameInput = labeledEdit("Name", safe.name)
+            val gradeInput = labeledEdit("Grade", safe.grade)
+            val majorInput = labeledEdit("Major", safe.major)
 
             AlertDialog.Builder(dialogContext)
                 .setTitle("Edit Profile")
                 .setView(container)
                 .setPositiveButton("Save") { _, _ ->
                     val newName = nameInput.text.toString().trim()
-                        .ifEmpty { current.name }
+                        .ifEmpty { safe.name }
                     val newGrade = gradeInput.text.toString().trim()
-                        .ifEmpty { current.grade }
+                        .ifEmpty { safe.grade }
                     val newMajor = majorInput.text.toString().trim()
-                        .ifEmpty { current.major }
+                        .ifEmpty { safe.major }
 
-                    val updated = ProfileEntity(
-                        id = 0,
-                        name = newName,
-                        grade = newGrade,
-                        major = newMajor
-                    )
-                    profileDao.saveProfile(updated)
-                    profile = updated
-                    updateHeaderFromProfile(updated)
+                    viewModel.updateProfile(newName, newGrade, newMajor)
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
 
         editBtn.setOnClickListener {
-            showEditDialog(profile)
+            showEditDialog(viewModel.profile.value)
         }
 
         // =============== 工具函数：白色卡片容器 ===============
@@ -263,7 +250,7 @@ class ProfileFragment : Fragment() {
                 setTextColor(Color.parseColor("#C4C4D0"))
             }
 
-        // =============== Notifications 卡片（已去掉 Class Reminders / Bus Alerts） ===============
+        // =============== Notifications 卡片（保留 Meal & Event） ===============
         val notificationCard = whiteCard()
 
         val notifTitle = TextView(context).apply {
@@ -333,7 +320,6 @@ class ProfileFragment : Fragment() {
             return row
         }
 
-        // 只保留 Meal Suggestions / Event Updates
         notificationCard.addView(
             notifRow(
                 "🍱",
@@ -405,7 +391,6 @@ class ProfileFragment : Fragment() {
 
         prefCard.addView(simpleRow("👤", "Personal Information"))
         prefCard.addView(simpleRow("🎯", "Health Goals"))
-
         root.addView(prefCard)
 
         // =============== Account 卡片 ===============
@@ -422,7 +407,6 @@ class ProfileFragment : Fragment() {
 
         accountCard.addView(simpleRow("🛡️", "Privacy & Security"))
         accountCard.addView(simpleRow("❓", "Help & Feedback"))
-
         root.addView(accountCard)
 
         // =============== Log Out 按钮 ===============

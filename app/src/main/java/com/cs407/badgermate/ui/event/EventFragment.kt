@@ -17,13 +17,15 @@ import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import com.cs407.badgermate.data.AppDatabase
+import androidx.fragment.app.viewModels
 import com.cs407.badgermate.data.event.EventEntity
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 
 class EventFragment : Fragment() {
+
+    private val viewModel: EventViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -34,7 +36,6 @@ class EventFragment : Fragment() {
         val context = requireContext()
         val dm = resources.displayMetrics
 
-        // ----------- 小工具函数 -----------
         fun Int.dp(): Int =
             TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, this.toFloat(), dm).toInt()
 
@@ -57,31 +58,22 @@ class EventFragment : Fragment() {
             })
         }
 
-        // ----------- DB & 全局状态 -----------
-        val db = AppDatabase.getInstance(requireContext())
-        val eventDao = db.eventDao()
-
         lateinit var upcomingTv: TextView
         lateinit var interestedTv: TextView
-        lateinit var categoriesTv: TextView
 
-        var currentFilter = "All"
         var searchQuery = ""
 
-        // 刷新列表的函数变量（解决函数互相依赖的问题）
         var refreshList: (() -> Unit)? = null
 
-        // ----------- 根布局 -----------
-        val scroll = ScrollView(context).apply {
-            isFillViewport = true
-        }
+        // 根布局
+        val scroll = ScrollView(context).apply { isFillViewport = true }
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(16.dp(), 40.dp(), 16.dp(), 96.dp())
         }
         scroll.addView(root)
 
-        // ----------- Header 区域 -----------
+        // Header 渐变背景
         val headerBg = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(Color.parseColor("#FF5AA5"), Color.parseColor("#7B5CFF"))
@@ -107,7 +99,7 @@ class EventFragment : Fragment() {
 
         addSpace(header, 16)
 
-        // ----------- 搜索栏 -----------
+        // 搜索栏
         val searchRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             background = GradientDrawable().apply {
@@ -139,7 +131,7 @@ class EventFragment : Fragment() {
 
         addSpace(header, 12)
 
-        // ----------- 顶部统计卡片 -----------
+        // 顶部统计：只剩 Upcoming & Interested 两个卡片
         fun statCard(label: String, assignRef: (TextView) -> Unit): View {
             val numTv = TextView(context).apply {
                 text = "0"
@@ -158,7 +150,9 @@ class EventFragment : Fragment() {
                 gravity = Gravity.CENTER
                 setPadding(12.dp(), 10.dp(), 12.dp(), 10.dp())
                 layoutParams =
-                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
+                        setMargins(6.dp(), 0, 6.dp(), 0)
+                    }
 
                 addView(numTv)
                 addView(TextView(context).apply {
@@ -169,17 +163,13 @@ class EventFragment : Fragment() {
             }
         }
 
-        val statsRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-        }
+        val statsRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
         statsRow.addView(statCard("Upcoming") { upcomingTv = it })
         statsRow.addView(statCard("Interested") { interestedTv = it })
-        statsRow.addView(statCard("Categories") { categoriesTv = it })
-
         header.addView(statsRow)
         root.addView(header)
 
-        // ----------- Add Event 按钮 -----------
+        // Add Event / Sync 按钮
         addSpace(root, 12)
 
         val addEventBtn = TextView(context).apply {
@@ -195,80 +185,21 @@ class EventFragment : Fragment() {
         }
         root.addView(addEventBtn)
 
-        // ----------- Category chips -----------
-        val chips = mutableMapOf<String, TextView>()
+        addSpace(root, 12)
 
-        fun updateChipStyles() {
-            chips.forEach { (label, tv) ->
-                val selected = (label == currentFilter)
-                tv.background = GradientDrawable().apply {
-                    cornerRadius = 999f
-                    if (selected) {
-                        setColor(Color.parseColor("#7B5CFF"))
-                    } else {
-                        setColor(Color.WHITE)
-                        setStroke(1.dp(), Color.parseColor("#E0E0F0"))
-                    }
-                }
-                tv.setTextColor(
-                    if (selected) Color.WHITE
-                    else Color.parseColor("#444466")
-                )
-            }
-        }
-
-        fun makeChip(label: String): TextView =
-            TextView(context).apply {
-                text = label
-                setPadding(12.dp(), 6.dp(), 12.dp(), 6.dp())
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setOnClickListener {
-                    currentFilter = label
-                    updateChipStyles()
-                    refreshList?.invoke()
-                }
-            }.also { chips[label] = it }
-
-        val chipRow = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf("All", "Academic", "Arts", "Sports", "Career").forEach {
-            chipRow.addView(makeChip(it))
-        }
-        root.addView(HorizontalScrollView(context).apply {
-            isHorizontalScrollBarEnabled = false
-            addView(chipRow)
-        })
-
-        addSpace(root, 8)
-
-        // ----------- 列表容器 -----------
-        val listContainer = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-        }
+        // 列表容器
+        val listContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         root.addView(listContainer)
 
-        // ----------- 渐变色 -----------
-        fun gradientFor(category: String): Pair<String, String> =
-            when (category.lowercase()) {
-                "academic" -> "#0EA5E9" to "#1D4ED8"
-                "arts" -> "#F97316" to "#EC4899"
-                "sports" -> "#22C55E" to "#16A34A"
-                "career" -> "#6366F1" to "#8B5CF6"
-                else -> "#0EA5E9" to "#7B5CFF"
-            }
-
-        // ----------- 更新顶部统计 -----------
-        fun updateStats(list: List<EventEntity>) {
-            val now = System.currentTimeMillis()
-            upcomingTv.text = list.count { it.startTime > now }.toString()
-            interestedTv.text = list.count { it.isMyEvent }.toString()
-            categoriesTv.text =
-                list.map { it.category.lowercase().trim() }.distinct().count().toString()
+        // 更新统计
+        fun updateStats(allEvents: List<EventEntity>) {
+            val (up, interested) = viewModel.calcStats(allEvents)
+            upcomingTv.text = up.toString()
+            interestedTv.text = interested.toString()
         }
 
-        // ----------- 构建单个 Event 卡片（只依赖 refreshList 变量） -----------
+        // 构建卡片（不再显示 category tag）
         fun buildCard(e: EventEntity): View {
-            val (c1, c2) = gradientFor(e.category)
-
             val cardBg = GradientDrawable().apply {
                 cornerRadius = 20.dp().toFloat()
                 setColor(Color.WHITE)
@@ -284,9 +215,13 @@ class EventFragment : Fragment() {
                 ).apply { setMargins(0, 12.dp(), 0, 0) }
             }
 
+            // 统一用一个渐变色 header
             val top = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
-                intArrayOf(Color.parseColor(c1), Color.parseColor(c2))
+                intArrayOf(
+                    Color.parseColor("#0EA5E9"),
+                    Color.parseColor("#7B5CFF")
+                )
             ).apply {
                 cornerRadii = floatArrayOf(
                     20.dp().toFloat(), 20.dp().toFloat(),
@@ -313,30 +248,10 @@ class EventFragment : Fragment() {
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
             }
 
-            val tag = TextView(context).apply {
-                text = e.category
-                background = GradientDrawable().apply {
-                    cornerRadius = 999f
-                    setColor(Color.parseColor("#F3F4FF"))
-                }
-                setPadding(10.dp(), 4.dp(), 10.dp(), 4.dp())
-            }
-
-            val headerRow = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-            }
-            headerRow.addView(LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams =
-                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-                addView(titleView)
-                addView(orgView)
-            })
-            headerRow.addView(tag)
-            headerPart.addView(headerRow)
+            headerPart.addView(titleView)
+            headerPart.addView(orgView)
             card.addView(headerPart)
 
-            // body
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(16.dp(), 12.dp(), 16.dp(), 12.dp())
@@ -358,7 +273,6 @@ class EventFragment : Fragment() {
             body.addView(info("📍", e.location))
             addSpace(body, 8)
 
-            // Interested 按钮
             fun buttonColor(isInterested: Boolean) =
                 if (isInterested) "#F43F5E" else "#111827"
 
@@ -379,10 +293,7 @@ class EventFragment : Fragment() {
             }
 
             btn.setOnClickListener {
-                val newFlag = !e.isMyEvent
-                eventDao.updateInterested(e.id, newFlag)
-                e.isMyEvent = newFlag
-                refreshList?.invoke()
+                viewModel.toggleInterested(e)
             }
 
             body.addView(btn)
@@ -390,19 +301,13 @@ class EventFragment : Fragment() {
             return card
         }
 
-        // ----------- 真正的刷新逻辑（本地函数），再赋给 refreshList 变量 -----------
+        // 刷新列表：只按搜索过滤
         fun doRefresh() {
-            var list = eventDao.getAllEvents()
+            val all = viewModel.events.value ?: emptyList()
+            updateStats(all)
 
-            // 更新统计
-            updateStats(list)
+            var list = all
 
-            // category filter
-            if (currentFilter != "All") {
-                list = list.filter { it.category.equals(currentFilter, ignoreCase = true) }
-            }
-
-            // search filter
             if (searchQuery.isNotBlank()) {
                 val q = searchQuery.lowercase()
                 list = list.filter {
@@ -416,10 +321,9 @@ class EventFragment : Fragment() {
             list.forEach { listContainer.addView(buildCard(it)) }
         }
 
-        // 赋值给变量，供其他地方调用
         refreshList = { doRefresh() }
 
-        // ----------- 监听 Search -----------
+        // 搜索监听
         searchInput.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
                 searchQuery = s?.toString() ?: ""
@@ -430,12 +334,14 @@ class EventFragment : Fragment() {
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
         })
 
-        // ----------- 初始状态 -----------
-        currentFilter = "All"
-        updateChipStyles()
+        // 监听 ViewModel 列表变化
+        viewModel.events.observe(viewLifecycleOwner) {
+            refreshList?.invoke()
+        }
+
         refreshList?.invoke()
 
-        // ----------- Add Event Dialog -----------
+        // Add Event 对话框（不再选择 category）
         fun showAddDialog() {
             val dialogCtx = requireContext()
             val layout = LinearLayout(dialogCtx).apply {
@@ -462,24 +368,6 @@ class EventFragment : Fragment() {
             val titleEd = field("Title", "Fall Hackathon")
             val orgEd = field("Organization", "CS Department")
 
-            layout.addView(TextView(dialogCtx).apply {
-                text = "Category"
-                setTextColor(Color.parseColor("#555555"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            })
-
-            val categories = listOf("Academic", "Arts", "Sports", "Career")
-            val categorySpinner = Spinner(dialogCtx).apply {
-                adapter = ArrayAdapter(
-                    dialogCtx,
-                    android.R.layout.simple_spinner_dropdown_item,
-                    categories
-                )
-            }
-            layout.addView(categorySpinner)
-            addSpace(layout, 8)
-
-            // 日期 & 时间
             val cal = Calendar.getInstance()
             val displayFormatter = SimpleDateFormat("MMM d • h:mm a", Locale.getDefault())
 
@@ -523,9 +411,6 @@ class EventFragment : Fragment() {
                 .setPositiveButton("Save") { _, _ ->
                     val title = titleEd.text.toString().ifBlank { "New Event" }
                     val org = orgEd.text.toString().ifBlank { "Unknown Org" }
-                    val category =
-                        (categorySpinner.selectedItem as? String)?.trim().orEmpty()
-                            .ifBlank { "Other" }
                     val display = dateTimeTv.text.toString().ifBlank { "TBD" }
                     val location = locationEd.text.toString().ifBlank { "TBD" }
 
@@ -538,7 +423,7 @@ class EventFragment : Fragment() {
                     val newEvent = EventEntity(
                         title = title,
                         organization = org,
-                        category = category,
+                        category = "General",   // 固定一个占位分类，不再展示
                         startTime = start,
                         endTime = end,
                         displayTime = display,
@@ -546,14 +431,23 @@ class EventFragment : Fragment() {
                         isMyEvent = false
                     )
 
-                    eventDao.insertEvent(newEvent)
-                    refreshList?.invoke()
+                    viewModel.addEvent(newEvent)
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
 
+        // 点击：手动添加
         addEventBtn.setOnClickListener { showAddDialog() }
+        // 长按：从官网同步 .ics
+        addEventBtn.setOnLongClickListener {
+            viewModel.syncFromIcs()
+            Toast.makeText(context, "Syncing events from UW calendar…", Toast.LENGTH_SHORT).show()
+            true
+        }
+
+        // Fragment 首次创建时自动同步一次
+        viewModel.syncFromIcs()
 
         return scroll
     }
