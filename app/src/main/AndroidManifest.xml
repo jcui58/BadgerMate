@@ -22,10 +22,11 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="AIzaSyCfQmDUfAy6CiEJJ2M4do-xg90Gstu5Ym4" />
 
+        <!-- Login Activity as the launcher -->
         <activity
-            android:name=".MainActivity"
+            android:name=".LoginActivity"
             android:exported="true"
-            android:label="@string/app_name">
+            android:theme="@style/Theme.BadgerMate.NoActionBar">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -33,6 +34,12 @@
             </intent-filter>
 
         </activity>
+
+        <!-- Main Activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/app_name" />
 
     </application>
 

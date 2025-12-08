@@ -6,165 +6,271 @@ import androidx.lifecycle.ViewModel
 import com.cs407.badgermate.data.User
 import com.cs407.badgermate.data.TodoItem
 import com.cs407.badgermate.data.Event
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Date
 
 class HomeViewModel : ViewModel() {
 
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
+
     // User Info
-    private val _userInfo = MutableLiveData<User>().apply {
-        value = User(
-            id = "user_001",
-            name = "John Doe",
-            email = "john.doe@example.com",
-            profileImage = null
-        )
-    }
+    private val _userInfo = MutableLiveData<User>()
     val userInfo: LiveData<User> = _userInfo
 
     // Courses
-    private val _courses = MutableLiveData<List<Course>>().apply {
-        value = emptyList()
-    }
+    private val _courses = MutableLiveData<List<Course>>()
     val courses: LiveData<List<Course>> = _courses
 
     // Todo Items
-    private val _todoItems = MutableLiveData<List<TodoItem>>().apply {
-        value = listOf(
-            TodoItem(
-                id = "todo_001",
-                title = "Complete project report",
-                description = "Finish the Q4 project report",
-                dueDate = Date(System.currentTimeMillis() + 86400000),
-                isCompleted = false,
-                priority = TodoItem.Priority.HIGH
-            ),
-            TodoItem(
-                id = "todo_002",
-                title = "Review team feedback",
-                description = "Check and respond to team feedback",
-                dueDate = Date(System.currentTimeMillis() + 172800000),
-                isCompleted = false,
-                priority = TodoItem.Priority.MEDIUM
-            ),
-            TodoItem(
-                id = "todo_003",
-                title = "Update documentation",
-                description = "Update API documentation",
-                dueDate = Date(System.currentTimeMillis() + 259200000),
-                isCompleted = true,
-                priority = TodoItem.Priority.LOW
-            ),
-            TodoItem(
-                id = "todo_004",
-                title = "Schedule meeting",
-                description = "Schedule team standup for next week",
-                dueDate = Date(System.currentTimeMillis() + 345600000),
-                isCompleted = false,
-                priority = TodoItem.Priority.MEDIUM
-            )
-        )
-    }
+    private val _todoItems = MutableLiveData<List<TodoItem>>()
     val todoItems: LiveData<List<TodoItem>> = _todoItems
 
     // Events
-    private val _events = MutableLiveData<List<Event>>().apply {
-        value = listOf(
-            Event(
-                id = "event_001",
-                title = "Team Meeting",
-                description = "Weekly team standup",
-                startTime = Date(System.currentTimeMillis() + 3600000),
-                endTime = Date(System.currentTimeMillis() + 5400000),
-                location = "Conference Room A"
-            ),
-            Event(
-                id = "event_002",
-                title = "Project Review",
-                description = "Q4 project review with stakeholders",
-                startTime = Date(System.currentTimeMillis() + 86400000),
-                endTime = Date(System.currentTimeMillis() + 90000000),
-                location = "Virtual - Zoom"
-            ),
-            Event(
-                id = "event_003",
-                title = "Client Presentation",
-                description = "Present new features to client",
-                startTime = Date(System.currentTimeMillis() + 172800000),
-                endTime = Date(System.currentTimeMillis() + 176400000),
-                location = "Client Office"
-            )
-        )
-    }
+    private val _events = MutableLiveData<List<Event>>()
     val events: LiveData<List<Event>> = _events
+
+    init {
+        loadUserData()
+        loadCourses()
+        loadTodoItems()
+        loadEvents()
+    }
+
+    // Load user data from Firestore
+    private fun loadUserData() {
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            db.collection("users")
+                .document(currentUser.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        val user = User.fromMap(document.data ?: emptyMap())
+                        _userInfo.value = user
+                    } else {
+                        // Fallback to basic user info
+                        _userInfo.value = User(
+                            id = currentUser.uid,
+                            name = "User",
+                            email = currentUser.email ?: "",
+                            profileImage = null
+                        )
+                    }
+                }
+                .addOnFailureListener {
+                    // Fallback to basic user info
+                    _userInfo.value = User(
+                        id = currentUser.uid,
+                        name = "User",
+                        email = currentUser.email ?: "",
+                        profileImage = null
+                    )
+                }
+        }
+    }
+
+    // Load courses from Firestore
+    private fun loadCourses() {
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("courses")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    _courses.value = emptyList()
+                    return@addSnapshotListener
+                }
+
+                val coursesList = snapshot?.documents?.mapNotNull { doc ->
+                    try {
+                        Course(
+                            id = doc.id,
+                            name = doc.getString("name") ?: "",
+                            daysOfWeek = (doc.get("daysOfWeek") as? List<Long>)?.map { it.toInt() } ?: emptyList(),
+                            startTime = doc.getString("startTime") ?: "",
+                            endTime = doc.getString("endTime") ?: ""
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                } ?: emptyList()
+
+                _courses.value = coursesList
+            }
+    }
+
+    // Load todo items from Firestore
+    private fun loadTodoItems() {
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    _todoItems.value = emptyList()
+                    return@addSnapshotListener
+                }
+
+                val todosList = snapshot?.documents?.mapNotNull { doc ->
+                    try {
+                        TodoItem(
+                            id = doc.id,
+                            title = doc.getString("title") ?: "",
+                            description = doc.getString("description"),
+                            dueDate = doc.getDate("dueDate"),
+                            isCompleted = doc.getBoolean("isCompleted") ?: false,
+                            priority = TodoItem.Priority.valueOf(
+                                doc.getString("priority") ?: "MEDIUM"
+                            )
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                } ?: emptyList()
+
+                _todoItems.value = todosList
+            }
+    }
+
+    // Load events from Firestore
+    private fun loadEvents() {
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("events")
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    _events.value = emptyList()
+                    return@addSnapshotListener
+                }
+
+                val eventsList = snapshot?.documents?.mapNotNull { doc ->
+                    try {
+                        Event(
+                            id = doc.id,
+                            title = doc.getString("title") ?: "",
+                            description = doc.getString("description") ?: "",
+                            startTime = doc.getDate("startTime") ?: Date(),
+                            endTime = doc.getDate("endTime") ?: Date(),
+                            location = doc.getString("location") ?: ""
+                        )
+                    } catch (e: Exception) {
+                        null
+                    }
+                } ?: emptyList()
+
+                _events.value = eventsList
+            }
+    }
 
     // Add new course
     fun addCourse(course: Course) {
-        val currentList = _courses.value ?: emptyList()
-        _courses.value = currentList + course
+        val currentUser = auth.currentUser ?: return
+
+        val courseData = hashMapOf(
+            "name" to course.name,
+            "daysOfWeek" to course.daysOfWeek,
+            "startTime" to course.startTime,
+            "endTime" to course.endTime,
+            "createdAt" to System.currentTimeMillis()
+        )
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("courses")
+            .add(courseData)
+            .addOnSuccessListener {
+                // Course added successfully - listener will update LiveData
+            }
     }
 
     // Delete course
     fun deleteCourse(courseId: String) {
-        val currentList = _courses.value ?: return
-        _courses.value = currentList.filter { it.id != courseId }
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("courses")
+            .document(courseId)
+            .delete()
     }
 
     // Helper function to toggle todo completion
     fun toggleTodoCompletion(todoId: String) {
-        val currentList = _todoItems.value ?: return
-        val updatedList = currentList.map { todo ->
-            if (todo.id == todoId) {
-                todo.copy(isCompleted = !todo.isCompleted)
-            } else {
-                todo
-            }
-        }
-        _todoItems.value = updatedList
+        val currentUser = auth.currentUser ?: return
+        val todoItem = _todoItems.value?.find { it.id == todoId } ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .document(todoId)
+            .update("isCompleted", !todoItem.isCompleted)
     }
 
     // Add new todo item
-    fun addTodoItem(title: String, description: String? = null, priority: TodoItem.Priority = TodoItem.Priority.MEDIUM, dueDate: Date? = null) {
-        val currentList = _todoItems.value ?: emptyList()
-        val newTodo = TodoItem(
-            id = "todo_${System.currentTimeMillis()}",
-            title = title,
-            description = description,
-            dueDate = dueDate,
-            isCompleted = false,
-            priority = priority
+    fun addTodoItem(
+        title: String,
+        description: String? = null,
+        priority: TodoItem.Priority = TodoItem.Priority.MEDIUM,
+        dueDate: Date? = null
+    ) {
+        val currentUser = auth.currentUser ?: return
+
+        val todoData = hashMapOf(
+            "title" to title,
+            "description" to description,
+            "priority" to priority.name,
+            "dueDate" to dueDate,
+            "isCompleted" to false,
+            "createdAt" to System.currentTimeMillis()
         )
-        _todoItems.value = currentList + newTodo
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .add(todoData)
     }
 
     // Delete todo item
     fun deleteTodoItem(todoId: String) {
-        val currentList = _todoItems.value ?: return
-        _todoItems.value = currentList.filter { it.id != todoId }
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .document(todoId)
+            .delete()
     }
 
     // Update todo priority
     fun updateTodoPriority(todoId: String, newPriority: TodoItem.Priority) {
-        val currentList = _todoItems.value ?: return
-        val updatedList = currentList.map { todo ->
-            if (todo.id == todoId) {
-                todo.copy(priority = newPriority)
-            } else {
-                todo
-            }
-        }
-        _todoItems.value = updatedList
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .document(todoId)
+            .update("priority", newPriority.name)
     }
 
     // Update todo title and description
     fun updateTodoItem(todoId: String, newTitle: String, newDescription: String? = null) {
-        val currentList = _todoItems.value ?: return
-        val updatedList = currentList.map { todo ->
-            if (todo.id == todoId) {
-                todo.copy(title = newTitle, description = newDescription)
-            } else {
-                todo
-            }
-        }
-        _todoItems.value = updatedList
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .collection("todos")
+            .document(todoId)
+            .update(
+                mapOf(
+                    "title" to newTitle,
+                    "description" to newDescription
+                )
+            )
     }
 }

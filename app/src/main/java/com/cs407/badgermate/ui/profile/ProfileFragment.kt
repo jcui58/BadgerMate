@@ -8,8 +8,14 @@ import android.util.TypedValue
 import android.view.*
 import android.widget.*
 import androidx.fragment.app.Fragment
+import android.content.Intent
+import com.cs407.badgermate.LoginActivity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 
 class ProfileFragment : Fragment() {
+    private lateinit var auth: FirebaseAuth
+    private lateinit var db: FirebaseFirestore
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -18,6 +24,9 @@ class ProfileFragment : Fragment() {
     ): View {
         val context = requireContext()
         val dm = resources.displayMetrics
+
+        auth = FirebaseAuth.getInstance()
+        db = FirebaseFirestore.getInstance()
 
         fun Int.dp(): Int =
             TypedValue.applyDimension(
@@ -58,7 +67,6 @@ class ProfileFragment : Fragment() {
         }
         scroll.addView(root)
 
-        // =============== 顶部渐变 Profile 区 ===============
         val headerGrad = GradientDrawable(
             GradientDrawable.Orientation.TL_BR,
             intArrayOf(
@@ -84,7 +92,7 @@ class ProfileFragment : Fragment() {
             setColor(Color.WHITE)
         }
         val avatar = TextView(context).apply {
-            text = "AJ"
+            text = "..."  // Will be updated after loading
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#7B5CFF"))
@@ -100,28 +108,51 @@ class ProfileFragment : Fragment() {
         addSpace(header, 8)
 
         val name = TextView(context).apply {
-            text = "Alex Johnson"
+            text = "Loading..."  // Will be updated after loading
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
         }
         header.addView(name)
 
-        val id = TextView(context).apply {
-            text = "2021001234"
+        val userEmail = TextView(context).apply {
+            text = auth.currentUser?.email ?: "Logout"
             subTitle()
         }
-        header.addView(id)
+        header.addView(userEmail)
 
-        val major = TextView(context).apply {
-            text = "Computer Science • Junior"
-            subTitle()
+
+        // Load user data from Firestore
+        val currentUser = auth.currentUser
+        if (currentUser != null) {
+            db.collection("users")
+                .document(currentUser.uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        val userName = document.getString("name") ?: "User"
+
+                        // Update name TextView
+                        name.text = userName
+
+                        // Update avatar with initials
+                        val initials = getInitials(userName)
+                        avatar.text = initials
+                    } else {
+                        // Fallback to email
+                        name.text = currentUser.email ?: "User"
+                        avatar.text = getInitials(currentUser.email ?: "U")
+                    }
+                }
+                .addOnFailureListener {
+                    // Fallback to email
+                    name.text = currentUser.email ?: "User"
+                    avatar.text = getInitials(currentUser.email ?: "U")
+                }
         }
-        header.addView(major)
 
         addSpace(header, 16)
 
-        // 顶部三张 stats 卡片
         fun statCard(icon: String, value: String, label: String): View {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -181,7 +212,6 @@ class ProfileFragment : Fragment() {
         header.addView(statsRow)
         root.addView(header)
 
-        // =============== Edit Profile 按钮 ===============
         addSpace(root, 16)
 
         val editBg = GradientDrawable().apply {
@@ -205,7 +235,6 @@ class ProfileFragment : Fragment() {
         }
         root.addView(editBtn)
 
-        // =============== 工具函数：白色卡片容器 ===============
         fun whiteCard(): LinearLayout {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -220,18 +249,16 @@ class ProfileFragment : Fragment() {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 16.dp(), 0, 0) }
+                ).apply { setMargins(0, 12.dp(), 0, 0) }
             }
         }
 
-        fun chevron(): TextView =
-            TextView(context).apply {
-                text = "›"
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                setTextColor(Color.parseColor("#C4C4D0"))
-            }
+        fun chevron(): TextView = TextView(context).apply {
+            text = "›"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+            setTextColor(Color.parseColor("#999999"))
+        }
 
-        // =============== Notifications 卡片（带开关） ===============
         val notificationCard = whiteCard()
 
         val notifTitle = TextView(context).apply {
@@ -311,14 +338,6 @@ class ProfileFragment : Fragment() {
         )
         notificationCard.addView(
             notifRow(
-                "🚌",
-                "Bus Alerts",
-                "When bus is arriving",
-                true
-            )
-        )
-        notificationCard.addView(
-            notifRow(
                 "🍱",
                 "Meal Suggestions",
                 "AI meal recommendations",
@@ -336,7 +355,6 @@ class ProfileFragment : Fragment() {
 
         root.addView(notificationCard)
 
-        // =============== Preferences 卡片 ===============
         val prefCard = whiteCard()
 
         val prefTitle = TextView(context).apply {
@@ -392,7 +410,6 @@ class ProfileFragment : Fragment() {
 
         root.addView(prefCard)
 
-        // =============== Account 卡片 ===============
         val accountCard = whiteCard()
 
         val accountTitle = TextView(context).apply {
@@ -409,7 +426,6 @@ class ProfileFragment : Fragment() {
 
         root.addView(accountCard)
 
-        // =============== Log Out 按钮 ===============
         addSpace(root, 16)
 
         val logoutBg = GradientDrawable().apply {
@@ -431,10 +447,16 @@ class ProfileFragment : Fragment() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
+            setOnClickListener {
+                // Sign out and return to login
+                auth.signOut()
+                val intent = Intent(requireContext(), LoginActivity::class.java)
+                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                startActivity(intent)
+            }
         }
         root.addView(logout)
 
-        // =============== 底部版本信息 ===============
         addSpace(root, 12)
 
         val footer = TextView(context).apply {
@@ -446,5 +468,25 @@ class ProfileFragment : Fragment() {
         root.addView(footer)
 
         return scroll
+    }
+
+    // Helper function to get initials from name
+    private fun getInitials(name: String): String {
+        val parts = name.trim().split(" ")
+        return when {
+            parts.size >= 2 -> {
+                // First and last name
+                "${parts.first().first().uppercaseChar()}${parts.last().first().uppercaseChar()}"
+            }
+            parts.size == 1 && parts[0].isNotEmpty() -> {
+                // Single name, take first two characters or just one
+                if (parts[0].length >= 2) {
+                    parts[0].take(2).uppercase()
+                } else {
+                    parts[0].first().uppercaseChar().toString()
+                }
+            }
+            else -> "U"  // Default
+        }
     }
 }
