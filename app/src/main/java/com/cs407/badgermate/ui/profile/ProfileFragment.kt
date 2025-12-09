@@ -4,10 +4,14 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
+import android.text.InputType
 import android.util.TypedValue
 import android.view.*
 import android.widget.*
+import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
+import com.cs407.badgermate.data.profile.ProfileEntity
 import android.content.Intent
 import com.cs407.badgermate.LoginActivity
 import com.google.firebase.auth.FirebaseAuth
@@ -16,6 +20,8 @@ import com.google.firebase.firestore.FirebaseFirestore
 class ProfileFragment : Fragment() {
     private lateinit var auth: FirebaseAuth
     private lateinit var db: FirebaseFirestore
+
+    private val viewModel: ProfileViewModel by viewModels()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -92,7 +98,7 @@ class ProfileFragment : Fragment() {
             setColor(Color.WHITE)
         }
         val avatar = TextView(context).apply {
-            text = "..."  // Will be updated after loading
+            text = ""
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#7B5CFF"))
@@ -107,109 +113,39 @@ class ProfileFragment : Fragment() {
 
         addSpace(header, 8)
 
+        // 名字 & 专业/年级
         val name = TextView(context).apply {
-            text = "Loading..."  // Will be updated after loading
+            text = ""
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
         }
         header.addView(name)
 
-        val userEmail = TextView(context).apply {
-            text = auth.currentUser?.email ?: "Logout"
+        val major = TextView(context).apply {
+            text = ""
             subTitle()
         }
-        header.addView(userEmail)
 
+        fun updateHeaderFromProfile(p: ProfileEntity) {
+            name.text = p.name
+            major.text = "${p.major} • ${p.grade}"
 
-        // Load user data from Firestore
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            db.collection("users")
-                .document(currentUser.uid)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        val userName = document.getString("name") ?: "User"
+            val initials = p.name.trim()
+                .split(" ")
+                .filter { it.isNotEmpty() }
+                .map { it[0].uppercaseChar() }
+                .joinToString("")
+                .take(2)
+            avatar.text = if (initials.isNotEmpty()) initials else "🙂"
+        }
 
-                        // Update name TextView
-                        name.text = userName
-
-                        // Update avatar with initials
-                        val initials = getInitials(userName)
-                        avatar.text = initials
-                    } else {
-                        // Fallback to email
-                        name.text = currentUser.email ?: "User"
-                        avatar.text = getInitials(currentUser.email ?: "U")
-                    }
-                }
-                .addOnFailureListener {
-                    // Fallback to email
-                    name.text = currentUser.email ?: "User"
-                    avatar.text = getInitials(currentUser.email ?: "U")
-                }
+        // 观察 ViewModel 中的 profile，自动刷新 UI
+        viewModel.profile.observe(viewLifecycleOwner) { p ->
+            updateHeaderFromProfile(p)
         }
 
         addSpace(header, 16)
-
-        fun statCard(icon: String, value: String, label: String): View {
-            val bg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 18.dp().toFloat()
-                setColor(Color.WHITE)
-            }
-
-            return LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                background = bg
-                setPadding(12.dp(), 10.dp(), 12.dp(), 10.dp())
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply { setMargins(4.dp(), 0, 4.dp(), 0) }
-
-                val topRow = LinearLayout(context).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                }
-                val i = TextView(context).apply {
-                    text = icon
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                }
-                topRow.addView(i)
-                addView(topRow)
-
-                val v = TextView(context).apply {
-                    text = value
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-                    setTypeface(typeface, Typeface.BOLD)
-                    setTextColor(Color.parseColor("#333366"))
-                }
-                addView(v)
-
-                val l = TextView(context).apply {
-                    text = label
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                    setTextColor(Color.parseColor("#777799"))
-                }
-                addView(l)
-            }
-        }
-
-        val statsRow = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
-        statsRow.addView(statCard("📚", "92%", "Attendance"))
-        statsRow.addView(statCard("⚡", "45.2K", "Steps"))
-        statsRow.addView(statCard("🏆", "12", "Events"))
-
-        header.addView(statsRow)
         root.addView(header)
 
         addSpace(root, 16)
@@ -235,6 +171,66 @@ class ProfileFragment : Fragment() {
         }
         root.addView(editBtn)
 
+        // === Edit Profile 对话框 ===
+        fun showEditDialog(current: ProfileEntity?) {
+            val dialogContext = requireContext()
+
+            val container = LinearLayout(dialogContext).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(20.dp(), 10.dp(), 20.dp(), 0)
+            }
+
+            fun labeledEdit(label: String, initial: String): EditText {
+                val labelView = TextView(dialogContext).apply {
+                    text = label
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                    setTextColor(Color.parseColor("#555555"))
+                }
+                container.addView(labelView)
+
+                val edit = EditText(dialogContext).apply {
+                    setText(initial)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                    setSingleLine(true)
+                    inputType = InputType.TYPE_CLASS_TEXT
+                }
+                container.addView(edit)
+                addSpace(container, 8)
+                return edit
+            }
+
+            val safe = current ?: ProfileEntity(
+                name = "Alex Johnson",
+                grade = "Junior",
+                major = "Computer Science"
+            )
+
+            val nameInput = labeledEdit("Name", safe.name)
+            val gradeInput = labeledEdit("Grade", safe.grade)
+            val majorInput = labeledEdit("Major", safe.major)
+
+            AlertDialog.Builder(dialogContext)
+                .setTitle("Edit Profile")
+                .setView(container)
+                .setPositiveButton("Save") { _, _ ->
+                    val newName = nameInput.text.toString().trim()
+                        .ifEmpty { safe.name }
+                    val newGrade = gradeInput.text.toString().trim()
+                        .ifEmpty { safe.grade }
+                    val newMajor = majorInput.text.toString().trim()
+                        .ifEmpty { safe.major }
+
+                    viewModel.updateProfile(newName, newGrade, newMajor)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+
+        editBtn.setOnClickListener {
+            showEditDialog(viewModel.profile.value)
+        }
+
+        // =============== 工具函数：白色卡片容器 ===============
         fun whiteCard(): LinearLayout {
             val bg = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
@@ -259,6 +255,7 @@ class ProfileFragment : Fragment() {
             setTextColor(Color.parseColor("#999999"))
         }
 
+        // =============== Notifications 卡片（保留 Meal & Event） ===============
         val notificationCard = whiteCard()
 
         val notifTitle = TextView(context).apply {
@@ -330,14 +327,6 @@ class ProfileFragment : Fragment() {
 
         notificationCard.addView(
             notifRow(
-                "📚",
-                "Class Reminders",
-                "Get notified before class",
-                true
-            )
-        )
-        notificationCard.addView(
-            notifRow(
                 "🍱",
                 "Meal Suggestions",
                 "AI meal recommendations",
@@ -355,6 +344,7 @@ class ProfileFragment : Fragment() {
 
         root.addView(notificationCard)
 
+        // =============== Preferences 卡片（保留 Personal Info / Health Goals） ===============
         val prefCard = whiteCard()
 
         val prefTitle = TextView(context).apply {
@@ -404,10 +394,8 @@ class ProfileFragment : Fragment() {
             return row
         }
 
-        prefCard.addView(simpleRow("🔔", "Notifications"))
         prefCard.addView(simpleRow("👤", "Personal Information"))
         prefCard.addView(simpleRow("🎯", "Health Goals"))
-
         root.addView(prefCard)
 
         val accountCard = whiteCard()
@@ -423,7 +411,6 @@ class ProfileFragment : Fragment() {
 
         accountCard.addView(simpleRow("🛡️", "Privacy & Security"))
         accountCard.addView(simpleRow("❓", "Help & Feedback"))
-
         root.addView(accountCard)
 
         addSpace(root, 16)
