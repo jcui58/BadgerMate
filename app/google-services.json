@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "571144031964",
+    "project_id": "badgermate",
+    "storage_bucket": "badgermate.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571144031964:android:89af5bdc0c6249683f2e19",
+        "android_client_info": {
+          "package_name": "com.cs407.badgermate"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALusWVQoNas-Ehayq27M3miZv2OgoCb8g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
