@@ -5,7 +5,6 @@ import com.cs407.badgermate.api.ChatCompletionRequest
 import com.cs407.badgermate.api.Message
 import com.cs407.badgermate.api.OpenAIApiService
 import com.cs407.badgermate.data.profile.ProfileEntity
-import com.cs407.badgermate.ui.dining.Dish
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import okhttp3.OkHttpClient
