@@ -3,11 +3,18 @@ package com.cs407.badgermate.data.profile
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-// 只存一条，所以 id 固定为 0
 @Entity(tableName = "profile")
 data class ProfileEntity(
-    @PrimaryKey val id: Int = 0,
-    val name: String,
-    val grade: String,   // 年级，比如 "Junior"
-    val major: String    // 专业，比如 "Computer Science"
+    @PrimaryKey
+    val uid: String = "",
+    val name: String = "",
+    val email: String = "",
+    val grade: String = "",
+    val major: String = "",
+    val profileImage: String? = null,
+    val heightFeet: String = "",
+    val heightInches: String = "",
+    val weight: String = "",
+    val gender: String = "",
+    val targetWeight: String = ""
 )

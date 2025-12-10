@@ -175,7 +175,7 @@ class EventFragment : Fragment() {
         addSpace(root, 12)
 
         val addEventBtn = TextView(context).apply {
-            text = "➕  Add Event"
+            text = "Press to Refresh"
             gravity = Gravity.CENTER
             setPadding(16.dp(), 10.dp(), 16.dp(), 10.dp())
             background = GradientDrawable().apply {
@@ -189,18 +189,15 @@ class EventFragment : Fragment() {
 
         addSpace(root, 12)
 
-        // 列表容器
         val listContainer = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         root.addView(listContainer)
 
-        // 更新统计
         fun updateStats(allEvents: List<EventEntity>) {
             val (up, interested) = viewModel.calcStats(allEvents)
             upcomingTv.text = up.toString()
             interestedTv.text = interested.toString()
         }
 
-        // ========= 构建卡片 =========
         fun buildCard(e: EventEntity): View {
             val cardBg = GradientDrawable().apply {
                 cornerRadius = 20.dp().toFloat()
@@ -217,7 +214,6 @@ class EventFragment : Fragment() {
                 ).apply { setMargins(0, 12.dp(), 0, 0) }
             }
 
-            // 顶部渐变 header
             val top = GradientDrawable(
                 GradientDrawable.Orientation.TL_BR,
                 intArrayOf(
@@ -263,7 +259,6 @@ class EventFragment : Fragment() {
             headerPart.addView(titleCol)
             card.addView(headerPart)
 
-            // ====== 下半部分：时间 / 地点 / 按钮行 ======
             val body = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
                 setPadding(16.dp(), 12.dp(), 16.dp(), 12.dp())
@@ -418,104 +413,104 @@ class EventFragment : Fragment() {
         refreshList?.invoke()
 
         // Add Event 对话框（不再选择 category）
-        fun showAddDialog() {
-            val dialogCtx = requireContext()
-            val layout = LinearLayout(dialogCtx).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(20.dp(), 10.dp(), 20.dp(), 0)
-            }
-
-            fun field(label: String, placeholder: String): EditText {
-                layout.addView(TextView(dialogCtx).apply {
-                    text = label
-                    setTextColor(Color.parseColor("#555555"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                })
-                val ed = EditText(dialogCtx).apply {
-                    hint = placeholder
-                    inputType = InputType.TYPE_CLASS_TEXT
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                }
-                layout.addView(ed)
-                addSpace(layout, 8)
-                return ed
-            }
-
-            val titleEd = field("Title", "Fall Hackathon")
-            val orgEd = field("Organization", "CS Department")
-
-            val cal = Calendar.getInstance()
-            val displayFormatter = SimpleDateFormat("MMM d • h:mm a", Locale.getDefault())
-
-            val dateTimeTv = TextView(dialogCtx).apply {
-                text = "Select date & time"
-                setTextColor(Color.parseColor("#333333"))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setPadding(0, 12.dp(), 0, 12.dp())
-            }
-            layout.addView(dateTimeTv)
-            addSpace(layout, 8)
-
-            dateTimeTv.setOnClickListener {
-                DatePickerDialog(
-                    dialogCtx,
-                    { _, y, m, d ->
-                        cal.set(y, m, d)
-                        TimePickerDialog(
-                            dialogCtx,
-                            { _, h, min ->
-                                cal.set(Calendar.HOUR_OF_DAY, h)
-                                cal.set(Calendar.MINUTE, min)
-                                dateTimeTv.text = displayFormatter.format(cal.time)
-                            },
-                            cal.get(Calendar.HOUR_OF_DAY),
-                            cal.get(Calendar.MINUTE),
-                            false
-                        ).show()
-                    },
-                    cal.get(Calendar.YEAR),
-                    cal.get(Calendar.MONTH),
-                    cal.get(Calendar.DAY_OF_MONTH)
-                ).show()
-            }
-
-            val locationEd = field("Location", "Engineering Hall 101")
-
-            AlertDialog.Builder(dialogCtx)
-                .setTitle("Add Event")
-                .setView(layout)
-                .setPositiveButton("Save") { _, _ ->
-                    val title = titleEd.text.toString().ifBlank { "New Event" }
-                    val org = orgEd.text.toString().ifBlank { "Unknown Org" }
-                    val display = dateTimeTv.text.toString().ifBlank { "TBD" }
-                    val location = locationEd.text.toString().ifBlank { "TBD" }
-
-                    val start = cal.timeInMillis
-                    val end = Calendar.getInstance().apply {
-                        timeInMillis = start
-                        add(Calendar.HOUR_OF_DAY, 1)
-                    }.timeInMillis
-
-                    val newEvent = EventEntity(
-                        title = title,
-                        organization = org,
-                        category = "General",
-                        startTime = start,
-                        endTime = end,
-                        displayTime = display,
-                        location = location,
-                        isMyEvent = false,
-                        url = null           // 手动添加的 event 默认没有链接
-                    )
-
-                    viewModel.addEvent(newEvent)
-                }
-                .setNegativeButton("Cancel", null)
-                .show()
-        }
-
-        // 点击：手动添加
-        addEventBtn.setOnClickListener { showAddDialog() }
+//        fun showAddDialog() {
+//            val dialogCtx = requireContext()
+//            val layout = LinearLayout(dialogCtx).apply {
+//                orientation = LinearLayout.VERTICAL
+//                setPadding(20.dp(), 10.dp(), 20.dp(), 0)
+//            }
+//
+//            fun field(label: String, placeholder: String): EditText {
+//                layout.addView(TextView(dialogCtx).apply {
+//                    text = label
+//                    setTextColor(Color.parseColor("#555555"))
+//                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+//                })
+//                val ed = EditText(dialogCtx).apply {
+//                    hint = placeholder
+//                    inputType = InputType.TYPE_CLASS_TEXT
+//                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+//                }
+//                layout.addView(ed)
+//                addSpace(layout, 8)
+//                return ed
+//            }
+//
+//            val titleEd = field("Title", "Fall Hackathon")
+//            val orgEd = field("Organization", "CS Department")
+//
+//            val cal = Calendar.getInstance()
+//            val displayFormatter = SimpleDateFormat("MMM d • h:mm a", Locale.getDefault())
+//
+//            val dateTimeTv = TextView(dialogCtx).apply {
+//                text = "Select date & time"
+//                setTextColor(Color.parseColor("#333333"))
+//                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+//                setPadding(0, 12.dp(), 0, 12.dp())
+//            }
+//            layout.addView(dateTimeTv)
+//            addSpace(layout, 8)
+//
+//            dateTimeTv.setOnClickListener {
+//                DatePickerDialog(
+//                    dialogCtx,
+//                    { _, y, m, d ->
+//                        cal.set(y, m, d)
+//                        TimePickerDialog(
+//                            dialogCtx,
+//                            { _, h, min ->
+//                                cal.set(Calendar.HOUR_OF_DAY, h)
+//                                cal.set(Calendar.MINUTE, min)
+//                                dateTimeTv.text = displayFormatter.format(cal.time)
+//                            },
+//                            cal.get(Calendar.HOUR_OF_DAY),
+//                            cal.get(Calendar.MINUTE),
+//                            false
+//                        ).show()
+//                    },
+//                    cal.get(Calendar.YEAR),
+//                    cal.get(Calendar.MONTH),
+//                    cal.get(Calendar.DAY_OF_MONTH)
+//                ).show()
+//            }
+//
+//            val locationEd = field("Location", "Engineering Hall 101")
+//
+//            AlertDialog.Builder(dialogCtx)
+//                .setTitle("Add Event")
+//                .setView(layout)
+//                .setPositiveButton("Save") { _, _ ->
+//                    val title = titleEd.text.toString().ifBlank { "New Event" }
+//                    val org = orgEd.text.toString().ifBlank { "Unknown Org" }
+//                    val display = dateTimeTv.text.toString().ifBlank { "TBD" }
+//                    val location = locationEd.text.toString().ifBlank { "TBD" }
+//
+//                    val start = cal.timeInMillis
+//                    val end = Calendar.getInstance().apply {
+//                        timeInMillis = start
+//                        add(Calendar.HOUR_OF_DAY, 1)
+//                    }.timeInMillis
+//
+//                    val newEvent = EventEntity(
+//                        title = title,
+//                        organization = org,
+//                        category = "General",
+//                        startTime = start,
+//                        endTime = end,
+//                        displayTime = display,
+//                        location = location,
+//                        isMyEvent = false,
+//                        url = null           // 手动添加的 event 默认没有链接
+//                    )
+//
+//                    viewModel.addEvent(newEvent)
+//                }
+//                .setNegativeButton("Cancel", null)
+//                .show()
+//        }
+//
+//        // 点击：手动添加
+//        addEventBtn.setOnClickListener { showAddDialog() }
         // 长按：从官网同步 .ics
         addEventBtn.setOnLongClickListener {
             viewModel.syncFromIcs()

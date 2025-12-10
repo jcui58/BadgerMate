@@ -1,38 +1,40 @@
 package com.cs407.badgermate.ui.profile
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
-import android.text.InputType
 import android.util.TypedValue
 import android.view.*
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import androidx.fragment.app.viewModels
-import com.cs407.badgermate.data.profile.ProfileEntity
-import android.content.Intent
+import androidx.lifecycle.ViewModelProvider
 import com.cs407.badgermate.LoginActivity
+import com.cs407.badgermate.R
 import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.firestore.FirebaseFirestore
 
 class ProfileFragment : Fragment() {
-    private lateinit var auth: FirebaseAuth
-    private lateinit var db: FirebaseFirestore
 
-    private val viewModel: ProfileViewModel by viewModels()
+    private lateinit var auth: FirebaseAuth
+    private lateinit var viewModel: ProfileViewModel
 
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): View {
+    ): View? {
+        auth = FirebaseAuth.getInstance()
+        viewModel = ViewModelProvider(requireActivity())[ProfileViewModel::class.java]
+
+        if (auth.currentUser == null) {
+            navigateToLogin()
+            return null
+        }
+
         val context = requireContext()
         val dm = resources.displayMetrics
-
-        auth = FirebaseAuth.getInstance()
-        db = FirebaseFirestore.getInstance()
 
         fun Int.dp(): Int =
             TypedValue.applyDimension(
@@ -46,15 +48,16 @@ class ProfileFragment : Fragment() {
             setTextColor(Color.parseColor(color))
         }
 
-        fun addSpace(parent: LinearLayout, h: Int) {
+        fun addSpace(parent: LinearLayout, heightDp: Int) {
             val s = Space(context)
             s.layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                h.dp()
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                heightDp.dp()
             )
             parent.addView(s)
         }
 
+        // ScrollView
         val scroll = ScrollView(context).apply {
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -65,415 +68,503 @@ class ProfileFragment : Fragment() {
 
         val root = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16.dp(), 40.dp(), 16.dp(), 96.dp())
-            layoutParams = ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                setPadding(16.dp(), 16.dp(), 16.dp(), 16.dp())
+            }
         }
         scroll.addView(root)
 
-        val headerGrad = GradientDrawable(
-            GradientDrawable.Orientation.TL_BR,
-            intArrayOf(
-                Color.parseColor("#7B5CFF"),
-                Color.parseColor("#FF5AA5")
-            )
-        ).apply { cornerRadius = 24.dp().toFloat() }
-
-        val header = LinearLayout(context).apply {
+        // Profile Card
+        val profileCard = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            background = headerGrad
-            setPadding(16.dp(), 24.dp(), 16.dp(), 20.dp())
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
-            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(16.dp(), 20.dp(), 16.dp(), 20.dp())
+            background = GradientDrawable(
+                GradientDrawable.Orientation.LEFT_RIGHT,
+                intArrayOf(
+                    Color.parseColor("#7C4DFF"),
+                    Color.parseColor("#E91E63")
+                )
+            ).apply { cornerRadius = 24.dp().toFloat() }
         }
+        root.addView(profileCard)
 
-        // 头像圆圈
-        val avatarBg = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.WHITE)
+        val headerRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
-        val avatar = TextView(context).apply {
-            text = ""
+        profileCard.addView(headerRow)
+
+        val avatarView = TextView(context).apply {
+            text = "U"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
             setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#7B5CFF"))
-            background = avatarBg
+            setTextColor(Color.parseColor("#7C4DFF"))
             gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                72.dp(),
-                72.dp()
-            )
+            val size = 56.dp()
+            layoutParams = LinearLayout.LayoutParams(size, size)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.WHITE)
+            }
         }
-        header.addView(avatar)
+        headerRow.addView(avatarView)
 
-        addSpace(header, 8)
+        val headerTextCol = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply { setMargins(16.dp(), 0, 0, 0) }
+        }
+        headerRow.addView(headerTextCol)
 
-        // 名字 & 专业/年级
-        val name = TextView(context).apply {
-            text = ""
+        val nameText = TextView(context).apply {
+            text = "User"
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.WHITE)
         }
-        header.addView(name)
+        headerTextCol.addView(nameText)
 
-        val major = TextView(context).apply {
+        val emailText = TextView(context).apply {
+            text = auth.currentUser?.email ?: ""
+            subTitle()
+        }
+        headerTextCol.addView(emailText)
+
+
+        val majorGradeText = TextView(context).apply {
             text = ""
             subTitle()
         }
+        headerTextCol.addView(majorGradeText)
 
-        fun updateHeaderFromProfile(p: ProfileEntity) {
-            name.text = p.name
-            major.text = "${p.major} • ${p.grade}"
+        addSpace(profileCard, 16)
 
-            val initials = p.name.trim()
-                .split(" ")
-                .filter { it.isNotEmpty() }
-                .map { it[0].uppercaseChar() }
-                .joinToString("")
-                .take(2)
-            avatar.text = if (initials.isNotEmpty()) initials else "🙂"
+
+        // Edit Profile
+        addSpace(root, 16)
+        val editProfileButton = Button(context).apply {
+            text = "Edit Profile"
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                cornerRadius = 16.dp().toFloat()
+                setColor(Color.parseColor("#7C4DFF"))
+            }
+
+
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
+        root.addView(editProfileButton)
 
-        // 观察 ViewModel 中的 profile，自动刷新 UI
-        viewModel.profile.observe(viewLifecycleOwner) { p ->
-            updateHeaderFromProfile(p)
-        }
-
-        addSpace(header, 16)
-        root.addView(header)
-
+        // Personal Information
         addSpace(root, 16)
 
-        val editBg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 999f
-            setColor(Color.parseColor("#8B5CFF"))
-        }
-
-        val editBtn = TextView(context).apply {
-            text = "👤  Edit Profile"
-            background = editBg
-            setPadding(16.dp(), 10.dp(), 16.dp(), 10.dp())
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setTextColor(Color.WHITE)
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
+        val personalCard = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setPadding(16.dp(), 16.dp(), 16.dp(), 16.dp())
+            background = GradientDrawable().apply {
+                cornerRadius = 20.dp().toFloat()
+                setColor(Color.WHITE)
+            }
+        }
+        root.addView(personalCard)
+
+        val personalTitleRow = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-        root.addView(editBtn)
+        personalCard.addView(personalTitleRow)
 
-        // === Edit Profile 对话框 ===
-        fun showEditDialog(current: ProfileEntity?) {
-            val dialogContext = requireContext()
+        val personalIcon = TextView(context).apply {
+            text = "\uD83D\uDD8A"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+        }
+        personalTitleRow.addView(personalIcon)
 
-            val container = LinearLayout(dialogContext).apply {
+        val personalTitle = TextView(context).apply {
+            text = "Personal Information"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.parseColor("#333366"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { setMargins(8.dp(), 0, 0, 0) }
+        }
+        personalTitleRow.addView(personalTitle)
+
+        val divider = View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                1.dp()
+            ).apply { setMargins(0, 12.dp(), 0, 12.dp()) }
+            setBackgroundColor(Color.parseColor("#E0E0E0"))
+        }
+        personalCard.addView(divider)
+
+        fun createInfoRow(icon: String, label: String): Pair<LinearLayout, TextView> {
+            val row = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { setMargins(0, 4.dp(), 0, 4.dp()) }
+            }
+
+            val iconView = TextView(context).apply {
+                text = icon
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            }
+            row.addView(iconView)
+
+            val col = LinearLayout(context).apply {
                 orientation = LinearLayout.VERTICAL
-                setPadding(20.dp(), 10.dp(), 20.dp(), 0)
+                layoutParams = LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                ).apply { setMargins(8.dp(), 0, 0, 0) }
             }
+            row.addView(col)
 
-            fun labeledEdit(label: String, initial: String): EditText {
-                val labelView = TextView(dialogContext).apply {
-                    text = label
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                    setTextColor(Color.parseColor("#555555"))
-                }
-                container.addView(labelView)
-
-                val edit = EditText(dialogContext).apply {
-                    setText(initial)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                    setSingleLine(true)
-                    inputType = InputType.TYPE_CLASS_TEXT
-                }
-                container.addView(edit)
-                addSpace(container, 8)
-                return edit
+            val labelView = TextView(context).apply {
+                text = label
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setTextColor(Color.parseColor("#555555"))
             }
+            col.addView(labelView)
 
-            val safe = current ?: ProfileEntity(
-                name = "Alex Johnson",
-                grade = "Junior",
-                major = "Computer Science"
+            val valueView = TextView(context).apply {
+                text = "Not set"
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(Color.parseColor("#333333"))
+            }
+            col.addView(valueView)
+
+            return row to valueView
+        }
+
+        val (heightRow, heightValue) = createInfoRow("\uD83D\uDCC8", "Height")
+        val (weightRow, weightValue) = createInfoRow("\u26F9", "Weight")
+        val (genderRow, genderValue) = createInfoRow("\uD83D\uDC64", "Gender")
+        val (targetRow, targetValue) = createInfoRow("\uD83C\uDFAF", "Target Weight")
+
+        personalCard.addView(heightRow)
+        personalCard.addView(weightRow)
+        personalCard.addView(genderRow)
+        personalCard.addView(targetRow)
+
+        addSpace(personalCard, 12)
+
+        val editPersonalButton = Button(context).apply {
+            text = "Edit Personal Information"
+            setTextColor(Color.WHITE)
+
+            background = GradientDrawable().apply {
+                cornerRadius = 16.dp().toFloat()
+                setColor(Color.parseColor("#7C4DFF"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
+        }
+        personalCard.addView(editPersonalButton)
 
-            val nameInput = labeledEdit("Name", safe.name)
-            val gradeInput = labeledEdit("Grade", safe.grade)
-            val majorInput = labeledEdit("Major", safe.major)
+        //  Log Out
+        addSpace(root, 16)
+        val logoutButton = Button(context).apply {
+            text = "Log Out"
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                cornerRadius = 16.dp().toFloat()
+                setColor(Color.parseColor("#F44336"))
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        }
+        root.addView(logoutButton)
 
-            AlertDialog.Builder(dialogContext)
-                .setTitle("Edit Profile")
-                .setView(container)
-                .setPositiveButton("Save") { _, _ ->
-                    val newName = nameInput.text.toString().trim()
-                        .ifEmpty { safe.name }
-                    val newGrade = gradeInput.text.toString().trim()
-                        .ifEmpty { safe.grade }
-                    val newMajor = majorInput.text.toString().trim()
-                        .ifEmpty { safe.major }
+        //
+        viewModel.profile.observe(viewLifecycleOwner) { profile ->
+            profile ?: return@observe
 
-                    viewModel.updateProfile(newName, newGrade, newMajor)
+            val displayName = if (profile.name.isNotBlank()) profile.name else "User"
+            nameText.text = displayName
+            avatarView.text = getInitials(displayName)
+
+            emailText.text =
+                if (profile.email.isNotBlank()) profile.email
+                else auth.currentUser?.email ?: ""
+
+            val mg = buildString {
+                if (profile.major.isNotBlank()) append(profile.major)
+                if (profile.major.isNotBlank() && profile.grade.isNotBlank()) append(" • ")
+                if (profile.grade.isNotBlank()) append(profile.grade)
+            }
+            majorGradeText.text = mg
+
+            fun formatHeight(feet: String?, inches: String?): String {
+                val f = feet?.takeIf { it.isNotBlank() }
+                val i = inches?.takeIf { it.isNotBlank() }
+                return if (f != null || i != null) {
+                    "${f ?: "0"}' ${i ?: "0"}\""
+                } else "Not set"
+            }
+
+            heightValue.text = formatHeight(profile.heightFeet, profile.heightInches)
+            weightValue.text =
+                if (profile.weight.isNotBlank()) "${profile.weight} lbs" else "Not set"
+            genderValue.text =
+                if (profile.gender.isNotBlank()) profile.gender else "Not set"
+            targetValue.text =
+                if (profile.targetWeight.isNotBlank()) "${profile.targetWeight} lbs" else "Not set"
+        }
+
+        // 点击事件
+        editProfileButton.setOnClickListener { showEditProfileDialog() }
+        editPersonalButton.setOnClickListener { showPersonalInfoDialog() }
+
+        logoutButton.setOnClickListener {
+            AlertDialog.Builder(requireContext())
+                .setTitle("Log Out")
+                .setMessage("Are you sure you want to log out?")
+                .setPositiveButton("Log Out") { _, _ ->
+                    auth.signOut()
+                    viewModel.clearAccountInfo()
+                    navigateToLogin()
                 }
                 .setNegativeButton("Cancel", null)
                 .show()
         }
 
-        editBtn.setOnClickListener {
-            showEditDialog(viewModel.profile.value)
-        }
-
-        // =============== 工具函数：白色卡片容器 ===============
-        fun whiteCard(): LinearLayout {
-            val bg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 18.dp().toFloat()
-                setColor(Color.WHITE)
-                setStroke(1.dp(), Color.parseColor("#E5E5EA"))
-            }
-            return LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                background = bg
-                setPadding(16.dp(), 16.dp(), 16.dp(), 16.dp())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 12.dp(), 0, 0) }
-            }
-        }
-
-        fun chevron(): TextView = TextView(context).apply {
-            text = "›"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
-            setTextColor(Color.parseColor("#999999"))
-        }
-
-        // =============== Notifications 卡片（保留 Meal & Event） ===============
-        val notificationCard = whiteCard()
-
-        val notifTitle = TextView(context).apply {
-            text = "Notifications"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#333366"))
-        }
-        notificationCard.addView(notifTitle)
-        addSpace(notificationCard, 12)
-
-        fun notifRow(icon: String, title: String, desc: String, enabled: Boolean): View {
-            val row = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 6.dp(), 0, 6.dp()) }
-                gravity = Gravity.CENTER_VERTICAL
-            }
-
-            val iconBg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 12.dp().toFloat()
-                setColor(Color.parseColor("#F3F4FF"))
-            }
-            val iconView = TextView(context).apply {
-                text = icon
-                background = iconBg
-                setPadding(10.dp(), 8.dp(), 10.dp(), 8.dp())
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                )
-            }
-
-            val textCol = LinearLayout(context).apply {
-                orientation = LinearLayout.VERTICAL
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply { setMargins(12.dp(), 0, 0, 0) }
-            }
-
-            val t = TextView(context).apply {
-                text = title
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#222244"))
-            }
-            val d = TextView(context).apply {
-                text = desc
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setTextColor(Color.parseColor("#777799"))
-            }
-            textCol.addView(t)
-            textCol.addView(d)
-
-            val sw = Switch(context).apply {
-                isChecked = enabled
-            }
-
-            row.addView(iconView)
-            row.addView(textCol)
-            row.addView(sw)
-            return row
-        }
-
-        notificationCard.addView(
-            notifRow(
-                "🍱",
-                "Meal Suggestions",
-                "AI meal recommendations",
-                false
-            )
-        )
-        notificationCard.addView(
-            notifRow(
-                "🎫",
-                "Event Updates",
-                "Updates for followed events",
-                true
-            )
-        )
-
-        root.addView(notificationCard)
-
-        // =============== Preferences 卡片（保留 Personal Info / Health Goals） ===============
-        val prefCard = whiteCard()
-
-        val prefTitle = TextView(context).apply {
-            text = "Preferences"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#333366"))
-        }
-        prefCard.addView(prefTitle)
-        addSpace(prefCard, 8)
-
-        fun simpleRow(icon: String, title: String): View {
-            val row = LinearLayout(context).apply {
-                orientation = LinearLayout.HORIZONTAL
-                layoutParams = LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT
-                ).apply { setMargins(0, 8.dp(), 0, 8.dp()) }
-                gravity = Gravity.CENTER_VERTICAL
-            }
-
-            val iconBg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = 12.dp().toFloat()
-                setColor(Color.parseColor("#F3F4FF"))
-            }
-            val iconView = TextView(context).apply {
-                text = icon
-                background = iconBg
-                setPadding(10.dp(), 8.dp(), 10.dp(), 8.dp())
-            }
-
-            val t = TextView(context).apply {
-                text = title
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setTextColor(Color.parseColor("#222244"))
-                layoutParams = LinearLayout.LayoutParams(
-                    0,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    1f
-                ).apply { setMargins(12.dp(), 0, 0, 0) }
-            }
-
-            row.addView(iconView)
-            row.addView(t)
-            row.addView(chevron())
-            return row
-        }
-
-        prefCard.addView(simpleRow("👤", "Personal Information"))
-        prefCard.addView(simpleRow("🎯", "Health Goals"))
-        root.addView(prefCard)
-
-        val accountCard = whiteCard()
-
-        val accountTitle = TextView(context).apply {
-            text = "Account"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-            setTypeface(typeface, Typeface.BOLD)
-            setTextColor(Color.parseColor("#333366"))
-        }
-        accountCard.addView(accountTitle)
-        addSpace(accountCard, 8)
-
-        accountCard.addView(simpleRow("🛡️", "Privacy & Security"))
-        accountCard.addView(simpleRow("❓", "Help & Feedback"))
-        root.addView(accountCard)
-
-        addSpace(root, 16)
-
-        val logoutBg = GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            cornerRadius = 999f
-            setColor(Color.parseColor("#FFF6F6"))
-            setStroke(1.dp(), Color.parseColor("#F97373"))
-        }
-
-        val logout = TextView(context).apply {
-            text = "↩  Log Out"
-            background = logoutBg
-            setTextColor(Color.parseColor("#EF4444"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setPadding(16.dp(), 10.dp(), 16.dp(), 10.dp())
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-            setOnClickListener {
-                // Sign out and return to login
-                auth.signOut()
-                val intent = Intent(requireContext(), LoginActivity::class.java)
-                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                startActivity(intent)
-            }
-        }
-        root.addView(logout)
-
-        addSpace(root, 12)
-
-        val footer = TextView(context).apply {
-            text = "BadgerMate v1.0.0\nMade with ❤ for students"
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-            setTextColor(Color.parseColor("#9CA3AF"))
-            textAlignment = View.TEXT_ALIGNMENT_CENTER
-        }
-        root.addView(footer)
-
         return scroll
     }
 
-    // Helper function to get initials from name
+    private fun navigateToLogin() {
+        val intent = Intent(requireContext(), LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        activity?.finish()
+    }
+
     private fun getInitials(name: String): String {
-        val parts = name.trim().split(" ")
+        val parts = name.trim()
+            .split(" ", "　", "\t", "\n")
+            .filter { it.isNotBlank() }
+
         return when {
-            parts.size >= 2 -> {
-                // First and last name
+            parts.size >= 2 ->
                 "${parts.first().first().uppercaseChar()}${parts.last().first().uppercaseChar()}"
-            }
-            parts.size == 1 && parts[0].isNotEmpty() -> {
-                // Single name, take first two characters or just one
-                if (parts[0].length >= 2) {
-                    parts[0].take(2).uppercase()
-                } else {
-                    parts[0].first().uppercaseChar().toString()
-                }
-            }
-            else -> "U"  // Default
+            parts.size == 1 && parts[0].isNotEmpty() ->
+                if (parts[0].length >= 2) parts[0].take(2).uppercase()
+                else parts[0].first().uppercaseChar().toString()
+            else -> "U"
         }
+    }
+
+    // edit Profile
+    private fun showEditProfileDialog() {
+        val profile = viewModel.profile.value
+
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 20)
+        }
+
+        val nameInput = EditText(requireContext()).apply {
+            hint = "Name"
+            setText(profile?.name ?: "")
+        }
+        val majorInput = EditText(requireContext()).apply {
+            hint = "Major"
+            setText(profile?.major ?: "")
+        }
+        val gradeInput = EditText(requireContext()).apply {
+            hint = "Grade (e.g., Freshman)"
+            setText(profile?.grade ?: "")
+        }
+
+        layout.addView(nameInput)
+        layout.addView(majorInput)
+        layout.addView(gradeInput)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Edit Profile")
+            .setView(layout)
+            .setPositiveButton("Save") { _, _ ->
+                val name = nameInput.text.toString().trim()
+                val major = majorInput.text.toString().trim()
+                val grade = gradeInput.text.toString().trim()
+
+                if (name.isEmpty()) {
+                    Toast.makeText(requireContext(), "Name cannot be empty", Toast.LENGTH_SHORT).show()
+                    return@setPositiveButton
+                }
+
+                viewModel.updateNameGradeMajor(name, grade, major)
+                Toast.makeText(requireContext(), "Saved successfully", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    // ====== Personal Information 弹窗 ======
+    private fun showPersonalInfoDialog() {
+        val profile = viewModel.profile.value ?: return
+
+        val layout = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(50, 40, 50, 40)
+        }
+
+        val genderLabel = TextView(requireContext()).apply {
+            text = "Gender"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        layout.addView(genderLabel)
+
+        val genderGroup = RadioGroup(requireContext()).apply {
+            orientation = RadioGroup.HORIZONTAL
+        }
+
+        val maleRadio = RadioButton(requireContext()).apply {
+            text = "Male"
+            id = View.generateViewId()
+        }
+        val femaleRadio = RadioButton(requireContext()).apply {
+            text = "Female"
+            id = View.generateViewId()
+        }
+        val otherRadio = RadioButton(requireContext()).apply {
+            text = "Other"
+            id = View.generateViewId()
+        }
+
+        genderGroup.addView(maleRadio)
+        genderGroup.addView(femaleRadio)
+        genderGroup.addView(otherRadio)
+
+        when (profile.gender) {
+            "Male" -> genderGroup.check(maleRadio.id)
+            "Female" -> genderGroup.check(femaleRadio.id)
+            "Other" -> genderGroup.check(otherRadio.id)
+        }
+
+        layout.addView(genderGroup)
+
+        val space1 = Space(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 20
+            )
+        }
+        layout.addView(space1)
+
+        val heightLabel = TextView(requireContext()).apply {
+            text = "Height"
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTypeface(typeface, Typeface.BOLD)
+        }
+        layout.addView(heightLabel)
+
+        val heightRow = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        val heightFeetEdit = EditText(requireContext()).apply {
+            hint = "Feet"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(profile.heightFeet)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply { setMargins(0, 0, 10, 0) }
+        }
+        val heightInchesEdit = EditText(requireContext()).apply {
+            hint = "Inches"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            setText(profile.heightInches)
+            layoutParams = LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
+            ).apply { setMargins(10, 0, 0, 0) }
+        }
+
+        heightRow.addView(heightFeetEdit)
+        heightRow.addView(heightInchesEdit)
+        layout.addView(heightRow)
+
+        val weightEdit = EditText(requireContext()).apply {
+            hint = "Weight (lbs)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(profile.weight)
+        }
+        layout.addView(weightEdit)
+
+        val targetWeightEdit = EditText(requireContext()).apply {
+            hint = "Target Weight (lbs)"
+            inputType = android.text.InputType.TYPE_CLASS_NUMBER or
+                    android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+            setText(profile.targetWeight)
+        }
+        layout.addView(targetWeightEdit)
+
+        AlertDialog.Builder(requireContext())
+            .setTitle("Personal Information")
+            .setView(layout)
+            .setPositiveButton("Save") { _, _ ->
+                val gender = when (genderGroup.checkedRadioButtonId) {
+                    maleRadio.id -> "Male"
+                    femaleRadio.id -> "Female"
+                    otherRadio.id -> "Other"
+                    else -> ""
+                }
+                val heightFeet = heightFeetEdit.text.toString().trim()
+                val heightInches = heightInchesEdit.text.toString().trim()
+                val weight = weightEdit.text.toString().trim()
+                val targetWeight = targetWeightEdit.text.toString().trim()
+
+                viewModel.updatePersonalInfo(
+                    heightFeet,
+                    heightInches,
+                    weight,
+                    gender,
+                    targetWeight
+                )
+                Toast.makeText(requireContext(), "Saved successfully", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 }

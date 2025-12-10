@@ -40,27 +40,25 @@ class HomeViewModel : ViewModel() {
 
     // Load user data from Firestore
     private fun loadUserData() {
-        val currentUser = auth.currentUser
-        if (currentUser != null) {
-            db.collection("users")
-                .document(currentUser.uid)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        val user = User.fromMap(document.data ?: emptyMap())
-                        _userInfo.value = user
-                    } else {
-                        // Fallback to basic user info
-                        _userInfo.value = User(
-                            id = currentUser.uid,
-                            name = "User",
-                            email = currentUser.email ?: "",
-                            profileImage = null
-                        )
-                    }
+        val currentUser = auth.currentUser ?: return
+
+        db.collection("users")
+            .document(currentUser.uid)
+            .addSnapshotListener { document, error ->
+                if (error != null) {
+                    _userInfo.value = User(
+                        id = currentUser.uid,
+                        name = "User",
+                        email = currentUser.email ?: "",
+                        profileImage = null
+                    )
+                    return@addSnapshotListener
                 }
-                .addOnFailureListener {
-                    // Fallback to basic user info
+
+                if (document != null && document.exists()) {
+                    val user = User.fromMap(document.data ?: emptyMap())
+                    _userInfo.value = user
+                } else {
                     _userInfo.value = User(
                         id = currentUser.uid,
                         name = "User",
@@ -68,8 +66,9 @@ class HomeViewModel : ViewModel() {
                         profileImage = null
                     )
                 }
-        }
+            }
     }
+
 
     // Load courses from Firestore
     private fun loadCourses() {

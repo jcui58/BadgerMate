@@ -7,15 +7,20 @@ import android.widget.EditText
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.cs407.badgermate.data.AppDatabase
 import com.cs407.badgermate.data.User
+import com.cs407.badgermate.data.profile.ProfileEntity
 import com.google.android.material.textfield.TextInputEditText
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var auth: FirebaseAuth
-    private lateinit var db: FirebaseFirestore
+    private lateinit var firestore: FirebaseFirestore
+    private lateinit var roomDb: AppDatabase
+
     private lateinit var emailEditText: TextInputEditText
     private lateinit var passwordEditText: TextInputEditText
     private lateinit var loginButton: Button
@@ -25,15 +30,16 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
 
         auth = FirebaseAuth.getInstance()
-        db = FirebaseFirestore.getInstance()
+        firestore = FirebaseFirestore.getInstance()
+        roomDb = AppDatabase.getInstance(this)
 
-        // Initialize views
         emailEditText = findViewById(R.id.emailEditText)
         passwordEditText = findViewById(R.id.passwordEditText)
         loginButton = findViewById(R.id.loginButton)
 
-        // Check if user is already logged in
+        // User have account, navigating to home page
         if (auth.currentUser != null) {
+            syncProfileFromFirestore()
             navigateToMain()
             return
         }
@@ -53,64 +59,56 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun validateInput(email: String, password: String): Boolean {
-        // Email validation
         val emailPattern = Regex("^[\\w.]+@([a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}$")
         if (!emailPattern.matches(email)) {
             emailEditText.error = "Please enter a valid email address."
             return false
         }
 
-        // Password validation
         if (password.isEmpty()) {
-            passwordEditText.error = "The password cannot be left blank."
+            passwordEditText.error = "Password cannot be empty."
             return false
         }
-
         if (password.length < 5) {
-            passwordEditText.error = "The password must be at least 5 characters long."
+            passwordEditText.error = "Password length must be at least 5 characters."
             return false
         }
-
-        // Check if password contains digit, lowercase, and uppercase
         if (!Regex("\\d+").containsMatchIn(password) ||
             !Regex("[a-z]+").containsMatchIn(password) ||
-            !Regex("[A-Z]+").containsMatchIn(password)) {
-            passwordEditText.error = "The password must contain numbers, lowercase letters and uppercase letters."
+            !Regex("[A-Z]+").containsMatchIn(password)
+        ) {
+            passwordEditText.error = "Passwords must contain numbers, lowercase letters, and uppercase letters."
             return false
         }
-
         return true
     }
 
+    // if user don't have account, auto sign in
     private fun loginOrRegister(email: String, password: String) {
-        // Disable button during operation
         loginButton.isEnabled = false
 
-        // Try to sign in first
         auth.signInWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 if (task.isSuccessful) {
-                    // Sign in success
-                    Toast.makeText(this, "Login Successfully", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "Login Successful", Toast.LENGTH_SHORT).show()
+                    syncProfileFromFirestore()
                     navigateToMain()
                 } else {
-                    // If sign in fails, try to create a new account
                     registerUser(email, password)
                 }
             }
     }
 
+    // sign up
     private fun registerUser(email: String, password: String) {
         auth.createUserWithEmailAndPassword(email, password)
             .addOnCompleteListener(this) { task ->
                 loginButton.isEnabled = true
 
                 if (task.isSuccessful) {
-                    // Registration success - show name input dialog
                     showNameInputDialog(email)
                 } else {
-                    // If registration fails, show error
-                    val errorMessage = task.exception?.message ?: "Authentication Failure"
+                    val errorMessage = task.exception?.message ?: "Authentication Failed"
                     Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show()
                 }
             }
@@ -120,7 +118,7 @@ class LoginActivity : AppCompatActivity() {
         val dialogView = layoutInflater.inflate(R.layout.dialog_name_input, null)
         val nameEditText = dialogView.findViewById<EditText>(R.id.nameEditText)
 
-        val dialog = AlertDialog.Builder(this)
+        AlertDialog.Builder(this)
             .setTitle("Welcome to BadgerMate！")
             .setMessage("Please Enter Your Name")
             .setView(dialogView)
@@ -128,42 +126,98 @@ class LoginActivity : AppCompatActivity() {
             .setPositiveButton("Confirm") { _, _ ->
                 val name = nameEditText.text.toString().trim()
                 if (name.isNotEmpty()) {
-                    saveUserToFirestore(email, name)
+                    saveUserProfile(email, name)
                 } else {
                     Toast.makeText(this, "Name can not be empty", Toast.LENGTH_SHORT).show()
-                    showNameInputDialog(email) // Show dialog again
+                    showNameInputDialog(email)
                 }
             }
-            .create()
-
-        dialog.show()
+            .show()
     }
 
-    private fun saveUserToFirestore(email: String, name: String) {
+
+    private fun saveUserProfile(email: String, name: String) {
         val firebaseUser = auth.currentUser ?: return
 
-        val user = User(
-            id = firebaseUser.uid,
-            name = name,
-            email = email,
-            profileImage = null,
-            createdAt = System.currentTimeMillis()
+        // Firestore user information
+        val userData = hashMapOf(
+            "id" to firebaseUser.uid,
+            "name" to name,
+            "email" to email,
+            "createdAt" to System.currentTimeMillis()
         )
 
-        db.collection("users")
+        firestore.collection("users")
             .document(firebaseUser.uid)
-            .set(user.toMap())
+            .set(userData, SetOptions.merge())
             .addOnSuccessListener {
+                val profileEntity = ProfileEntity(
+                    uid = firebaseUser.uid,
+                    name = name,
+                    email = email
+                )
+                roomDb.profileDao().saveProfile(profileEntity)
+
                 Toast.makeText(this, "Registration successful. Welcome $name！", Toast.LENGTH_SHORT).show()
                 navigateToMain()
             }
             .addOnFailureListener { e ->
-                Toast.makeText(this, "Failed to save user information：${e.message}", Toast.LENGTH_LONG).show()
-                navigateToMain() // Still navigate even if Firestore fails
+                Toast.makeText(this, "Failed to save user information:${e.message}", Toast.LENGTH_LONG).show()
+                navigateToMain()
+            }
+    }
+
+    // after login, loading data from firebase to local room
+    private fun syncProfileFromFirestore() {
+        val currentUser = auth.currentUser ?: return
+
+        firestore.collection("users")
+            .document(currentUser.uid)
+            .get()
+            .addOnSuccessListener { document ->
+                val existingProfile =
+                    roomDb.profileDao().getProfileForUid(currentUser.uid)
+
+                val name = document.getString("name") ?: existingProfile?.name ?: ""
+                val email = document.getString("email")
+                    ?: existingProfile?.email
+                    ?: currentUser.email
+                    ?: ""
+
+                val grade = document.getString("grade") ?: existingProfile?.grade ?: ""
+                val major = document.getString("major") ?: existingProfile?.major ?: ""
+
+                val heightFeet =
+                    document.getString("heightFeet") ?: existingProfile?.heightFeet ?: ""
+                val heightInches =
+                    document.getString("heightInches") ?: existingProfile?.heightInches ?: ""
+                val weight =
+                    document.getString("weight") ?: existingProfile?.weight ?: ""
+                val gender =
+                    document.getString("gender") ?: existingProfile?.gender ?: ""
+                val targetWeight =
+                    document.getString("targetWeight") ?: existingProfile?.targetWeight ?: ""
+
+                val profileEntity = ProfileEntity(
+                    uid = currentUser.uid,
+                    name = name,
+                    email = email,
+                    grade = grade,
+                    major = major,
+                    profileImage = existingProfile?.profileImage,
+                    heightFeet = heightFeet,
+                    heightInches = heightInches,
+                    weight = weight,
+                    gender = gender,
+                    targetWeight = targetWeight
+                )
+
+                roomDb.profileDao().saveProfile(profileEntity)
             }
     }
 
     private fun navigateToMain() {
+        loginButton.isEnabled = true
         val intent = Intent(this, MainActivity::class.java)
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
