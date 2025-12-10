@@ -40,19 +40,9 @@ fun DiningScreen(viewModel: DiningViewModel, profileViewModel: ProfileViewModel)
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFFF5F5F5))
-            .padding(16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        // Header
-        item {
-            Text(
-                text = "Dining Halls",
-                fontSize = 28.sp,
-                modifier = Modifier.padding(bottom = 8.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-
         // AI Recommendation Section
         item {
             Row(
@@ -77,7 +67,7 @@ fun DiningScreen(viewModel: DiningViewModel, profileViewModel: ProfileViewModel)
                     enabled = userProfile != null && !uiState.isLoadingRecommendation,
                     modifier = Modifier.height(40.dp)
                 ) {
-                    Text(if (uiState.isLoadingRecommendation) "Generating..." else "Generate")
+                    Text(if (uiState.isLoadingRecommendation) "Generating..." else "New Suggestion")
                 }
             }
         }

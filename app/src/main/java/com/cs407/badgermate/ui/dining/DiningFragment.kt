@@ -30,6 +30,13 @@ class DiningFragment : Fragment() {
         _binding = FragmentDiningBinding.inflate(inflater, container, false)
         val root: View = binding.root
 
+        // Auto-generate recommendation when profile is available
+        profileViewModel.profile.observe(viewLifecycleOwner) { profile ->
+            if (profile != null) {
+                diningViewModel.generateMenuRecommendation(profile)
+            }
+        }
+
         binding.diningCompose.apply {
             setViewCompositionStrategy(
                 ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
