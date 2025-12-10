@@ -26,9 +26,18 @@ class DiningViewModel(application: Application) : AndroidViewModel(application) 
     
     private lateinit var menuRecommendationRepository: MenuRecommendationRepository
     
+    private var hasGeneratedInitialRecommendation = false
+    
     // This should be set from your secure storage or BuildConfig
     private val openAIApiKey: String
         get() = BuildConfig.OPENAI_API_KEY
+
+    fun generateInitialRecommendationOnce(userProfile: ProfileEntity?) {
+        if (!hasGeneratedInitialRecommendation) {
+            hasGeneratedInitialRecommendation = true
+            generateMenuRecommendation(userProfile)
+        }
+    }
 
     fun generateMenuRecommendation(userProfile: ProfileEntity?) {
         Log.d("DiningViewModel", "generateMenuRecommendation called")
