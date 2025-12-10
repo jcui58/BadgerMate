@@ -50,11 +50,10 @@ class MenuRecommendationRepository(
     private val openAIService = retrofit.create(OpenAIApiService::class.java)
     
     /**
-     * Generate personalized menu recommendations based on user profile and available dishes
+     * Generate personalized menu recommendations based on user profile
      */
     suspend fun generateMenuRecommendation(
-        userProfile: ProfileEntity,
-        availableDishes: List<Dish>
+        userProfile: ProfileEntity
     ): String {
         // Calculate BMI and other metrics
         val heightInches = (userProfile.heightFeet.toIntOrNull() ?: 0) * 12 + 
@@ -67,29 +66,37 @@ class MenuRecommendationRepository(
         }
         
         val targetWeight = userProfile.targetWeight.toDoubleOrNull() ?: weight
-        val weightDifference = targetWeight - weight
+        val healthGoal = when {
+            targetWeight < weight -> "weight loss"
+            targetWeight > weight -> "weight gain/muscle building"
+            else -> "weight maintenance"
+        }
         
         // Create prompt for ChatGPT
         val systemPrompt = """
-            You are a professional nutrition advisor. Recommend 3-4 dishes from the menu that suit the user's profile and goals.
-            Keep explanations brief and focus on key benefits. End with a summary of the recommended menu.
+            You are a professional nutrition advisor. Generate a personalized daily menu for a college student.
+            Create 3-4 realistic dishes that college students commonly eat (consider campus cafeteria, delivery, simple cooking).
+            Keep explanations brief and focus on nutrition benefits. End with a "RECOMMENDED MENU" summary.
         """.trimIndent()
         
         val userPrompt = """
-            Your Profile:
+            Generate a daily menu for a college student with these details:
             - Height: ${userProfile.heightFeet}'${userProfile.heightInches}"
             - Current Weight: ${userProfile.weight} lbs
             - Target Weight: ${userProfile.targetWeight} lbs
-            - Gender: ${userProfile.gender}
+            - Goal: $healthGoal
             - BMI: ${"%.1f".format(bmi)}
             
-            Available Dishes:
-            ${availableDishes.joinToString("\n") { dish ->
-                "- ${dish.name} (${dish.calories} calories) - Tags: ${dish.tags.joinToString(", ")}"
-            }}
+            Create 3-4 dishes that:
+            1. College students commonly eat (ramen, rice bowls, sandwiches, dumplings, fried rice, pasta, burgers, etc.)
+            2. Support their health goal
+            3. Are realistic for dorm/simple cooking
             
-            Recommend 3-4 dishes. For each, briefly explain why it's good for you and total calories.
-            At the end, provide a "RECOMMENDED MENU" section with all dishes combined with total calories.
+            For each dish, briefly explain:
+            - Why it's suitable for their goal
+            - Approximate calories
+            
+            End with a "RECOMMENDED MENU" section listing all dishes and total daily calories.
             Keep each explanation to 1-2 sentences max.
         """.trimIndent()
         

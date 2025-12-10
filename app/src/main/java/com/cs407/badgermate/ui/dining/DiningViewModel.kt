@@ -106,11 +106,9 @@ class DiningViewModel(application: Application) : AndroidViewModel(application) 
             _uiState.value = _uiState.value.copy(isLoadingRecommendation = true, recommendationError = "")
             
             try {
-                val allDishes = _uiState.value.hall1Menu + _uiState.value.hall2Menu
-                Log.d("DiningViewModel", "Calling generateMenuRecommendation with ${allDishes.size} dishes")
+                Log.d("DiningViewModel", "Generating menu recommendation")
                 val recommendation = menuRecommendationRepository.generateMenuRecommendation(
-                    userProfile = userProfile,
-                    availableDishes = allDishes
+                    userProfile = userProfile
                 )
                 
                 Log.d("DiningViewModel", "Recommendation received: ${recommendation.take(50)}...")
