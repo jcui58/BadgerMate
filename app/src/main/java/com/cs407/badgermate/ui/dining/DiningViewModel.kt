@@ -1,9 +1,17 @@
 package com.cs407.badgermate.ui.dining
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import android.util.Log
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.viewModelScope
+import com.cs407.badgermate.BuildConfig
+import com.cs407.badgermate.data.profile.ProfileEntity
+import com.cs407.badgermate.data.repository.MenuRecommendationRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 data class MealItem(
     val name: String,
@@ -26,13 +34,6 @@ data class Dish(
 )
 
 data class DiningUiState(
-    val completionPercent: Int = 43,
-    val dailyCalories: Int = 950,
-    val dailyGoalCalories: Int = 2200,
-    val remainingCalories: Int = 1250,
-    val protein: Int = 75,
-    val carbs: Int = 95,
-    val fat: Int = 22,
     val lunch: MealUi = MealUi(
         title = "Lunch",
         hall = "Dining Hall #1",
@@ -67,13 +68,67 @@ data class DiningUiState(
         Dish("Grilled Salmon", listOf("Omega 3"), 420),
         Dish("Caesar Salad", listOf("Light"), 190),
         Dish("Miso Soup", listOf("Warm"), 90)
-    )
+    ),
+    val aiRecommendation: String = "",
+    val isLoadingRecommendation: Boolean = false,
+    val recommendationError: String = ""
 )
 
-class DiningViewModel : ViewModel() {
+class DiningViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(DiningUiState())
     val uiState: StateFlow<DiningUiState> = _uiState.asStateFlow()
+    
+    private lateinit var menuRecommendationRepository: MenuRecommendationRepository
+    
+    // This should be set from your secure storage or BuildConfig
+    private val openAIApiKey: String
+        get() = BuildConfig.OPENAI_API_KEY
 
-    // 后面如果要跟后端联动，就在这里写更新函数
+    fun generateMenuRecommendation(userProfile: ProfileEntity?) {
+        Log.d("DiningViewModel", "generateMenuRecommendation called")
+        
+        if (userProfile == null) {
+            updateError("User profile not available")
+            return
+        }
+        
+        if (openAIApiKey.isEmpty()) {
+            Log.e("DiningViewModel", "OpenAI API Key is empty!")
+            updateError("OpenAI API Key not configured")
+            return
+        }
+        
+        Log.d("DiningViewModel", "Creating MenuRecommendationRepository with key length: ${openAIApiKey.length}")
+        menuRecommendationRepository = MenuRecommendationRepository(openAIApiKey)
+        
+        viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isLoadingRecommendation = true, recommendationError = "")
+            
+            try {
+                val allDishes = _uiState.value.hall1Menu + _uiState.value.hall2Menu
+                Log.d("DiningViewModel", "Calling generateMenuRecommendation with ${allDishes.size} dishes")
+                val recommendation = menuRecommendationRepository.generateMenuRecommendation(
+                    userProfile = userProfile,
+                    availableDishes = allDishes
+                )
+                
+                Log.d("DiningViewModel", "Recommendation received: ${recommendation.take(50)}...")
+                _uiState.value = _uiState.value.copy(
+                    aiRecommendation = recommendation,
+                    isLoadingRecommendation = false
+                )
+            } catch (e: Exception) {
+                Log.e("DiningViewModel", "Exception caught: ${e.message}", e)
+                updateError("Failed to generate recommendation: ${e.message}")
+            }
+        }
+    }
+    
+    private fun updateError(error: String) {
+        _uiState.value = _uiState.value.copy(
+            recommendationError = error,
+            isLoadingRecommendation = false
+        )
+    }
 }

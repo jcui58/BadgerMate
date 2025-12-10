@@ -6,6 +6,19 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+import java.util.Properties
+import java.io.FileInputStream
+
+// Load local properties
+val localPropsFile = rootProject.file("local.properties")
+val localProperties = Properties()
+if (localPropsFile.exists()) {
+    localProperties.load(FileInputStream(localPropsFile))
+}
+
+val mapsApiKey = localProperties.getProperty("MAPS_API_KEY", "")
+val openAiApiKey = localProperties.getProperty("OPENAI_API_KEY", "")
+
 android {
     namespace = "com.cs407.badgermate"
     compileSdk = 36
@@ -22,7 +35,13 @@ android {
         buildConfigField(
             "String",
             "MAPS_API_KEY",
-            "\"${project.findProperty("MAPS_API_KEY")}\""
+            "\"$mapsApiKey\""
+        )
+
+        buildConfigField(
+            "String",
+            "OPENAI_API_KEY",
+            "\"$openAiApiKey\""
         )
 
         manifestPlaceholders["MAPS_API_KEY"] =
@@ -75,6 +94,7 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.activity:activity-compose:1.9.2")
+    implementation("androidx.compose.runtime:runtime-livedata:1.6.0")
 
     // Maps
     implementation("com.google.android.gms:play-services-maps:19.1.0")
@@ -85,9 +105,12 @@ dependencies {
     // Retrofit
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.11.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.11.0")
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
